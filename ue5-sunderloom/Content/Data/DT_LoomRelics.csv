@@ -1,0 +1,16 @@
+---,RelicID,DisplayName,Description,Rarity,TargetStat,ModifierType,ModifierValue
+Relic_ObsidianHeart,Relic_ObsidianHeart,"Obsidian Heart","+25 Maximum Health",Common,MaxHealth,FlatAdd,25.0
+Relic_ForgeEdge,Relic_ForgeEdge,"Tempered Forge Edge","+6 Base Melee Damage",Common,MeleeDamage,FlatAdd,6.0
+Relic_AetherQuiver,Relic_AetherQuiver,"Aether Prism","+5 Base Ranged Damage",Common,RangedDamage,FlatAdd,5.0
+Relic_QuicksilverGreaves,Relic_QuicksilverGreaves,"Quicksilver Greaves","+10% Movement Speed",Common,MoveSpeed,PercentMult,0.10
+Relic_KeenedSpindle,Relic_KeenedSpindle,"Keened Spindle","+12% Attack Speed",Common,AttackSpeed,PercentMult,0.12
+Relic_EyeOfTheWeave,Relic_EyeOfTheWeave,"Eye of the Weave","+8% Critical Chance",Common,CritChance,FlatAdd,0.08
+Relic_ThreadStep,Relic_ThreadStep,"Phase-Thread Buckle","-12% Phase Step Cooldown",Common,DodgeCooldown,PercentMult,-0.12
+Relic_RunicAegis,Relic_RunicAegis,"Runic Aegis Plate","+50 Maximum Health",Rare,MaxHealth,FlatAdd,50.0
+Relic_SunderingCleaver,Relic_SunderingCleaver,"Sundering Rune Edge","+22% Melee Damage",Rare,MeleeDamage,PercentMult,0.22
+Relic_LanceAmplifier,Relic_LanceAmplifier,"Resonant Lance Core","+25% Ranged Damage",Rare,RangedDamage,PercentMult,0.25
+Relic_WhirlwindSpool,Relic_WhirlwindSpool,"Whirlwind Spool","+20% Attack Speed",Rare,AttackSpeed,PercentMult,0.20
+Relic_PhantomStride,Relic_PhantomStride,"Phantom Loom Stride","-22% Phase Step Cooldown",Rare,DodgeCooldown,PercentMult,-0.22
+Relic_HeartOfTheVault,Relic_HeartOfTheVault,"Heart of the Shifting Vault","+35% Maximum Health",Epic,MaxHealth,PercentMult,0.35
+Relic_ApexWeaverFang,Relic_ApexWeaverFang,"Apex Weaver Fang","+38% Melee Damage",Epic,MeleeDamage,PercentMult,0.38
+Relic_SovereignLens,Relic_SovereignLens,"Sovereign Aether Lens","+20% Critical Chance",Epic,CritChance,FlatAdd,0.20

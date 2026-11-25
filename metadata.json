@@ -1,0 +1,6 @@
+{
+  "name": "SUNDERLOOM — Unreal Engine 5 C++ Studio & Playable Roguelite",
+  "description": "Complete Unreal Engine 5 C++ source project and playable vertical slice for SUNDERLOOM: The Shifting Vault — a Third-Person Procedural Dungeon Roguelite with Modular Combat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

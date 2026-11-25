@@ -1,0 +1,31 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "SUNDERLOOM: The Shifting Vault — Ultra-Realistic Third-Person Procedural Dungeon Roguelite with Modular Combat in Unreal Engine 5.8 C++.",
+	"Modules": [
+		{
+			"Name": "Sunderloom",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine",
+				"AIModule",
+				"NavigationSystem",
+				"UMG",
+				"EnhancedInput",
+				"PhysicsCore"
+			]
+		}
+	],
+	"Plugins": [
+		{ "Name": "EnhancedInput", "Enabled": true },
+		{ "Name": "Niagara", "Enabled": true },
+		{ "Name": "MotionWarping", "Enabled": true },
+		{ "Name": "ControlRig", "Enabled": true },
+		{ "Name": "PoseSearch", "Enabled": true },
+		{ "Name": "Metasound", "Enabled": true },
+		{ "Name": "ChaosClothAsset", "Enabled": true },
+		{ "Name": "GeometryCollectionPlugin", "Enabled": true }
+	]
+}

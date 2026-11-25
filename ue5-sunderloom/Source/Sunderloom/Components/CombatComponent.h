@@ -10,6 +10,7 @@ class USkeletalMeshComponent;
 class ARuneProjectile;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCombatStateChangedSignature, ECombatState, NewState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSuperChargeChangedSignature, float, SuperChargePercent);
 
 UCLASS(ClassGroup=(Sunderloom), meta=(BlueprintSpawnableComponent))
 class SUNDERLOOM_API UCombatComponent : public UActorComponent
@@ -29,6 +30,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Sunderloom|Combat")
 	void RequestRuneLance();
+
+	UFUNCTION(BlueprintCallable, Category = "Sunderloom|Combat")
+	void RequestAetherSuper();
+
+	UFUNCTION(BlueprintCallable, Category = "Sunderloom|Combat")
+	void AddSuperCharge(float Amount);
+
+	UFUNCTION(BlueprintPure, Category = "Sunderloom|Combat")
+	float GetSuperChargePercent() const { return SuperCharge; }
 
 	UFUNCTION(BlueprintCallable, Category = "Sunderloom|Combat")
 	bool TryCancelIntoDodge();
@@ -60,11 +70,15 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Sunderloom|Combat")
 	FOnCombatStateChangedSignature OnCombatStateChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "Sunderloom|Combat")
+	FOnSuperChargeChangedSignature OnSuperChargeChanged;
+
 protected:
 	void ExecuteComboStep(int32 StepIndex, bool bHeavy);
 	void FinishAttackRecovery();
 	void RecoverFromStagger();
-	void SpawnRuneProjectileFromAim();
+	void SpawnRuneProjectileFromAim(float DamageMultiplier = 1.0f);
+	void SpawnRadialSuperBolts();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Combat")
 	TArray<TObjectPtr<UAnimMontage>> LightComboMontages;
@@ -99,6 +113,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Combat")
 	float RuneLanceCooldown = 0.55f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Combat")
+	float SuperNovaRadiusCm = 760.0f;
+
 private:
 	ECombatState CombatState = ECombatState::Idle;
 	int32 ComboIndex = 0;
@@ -106,6 +123,7 @@ private:
 	bool bCurrentAttackIsHeavy = false;
 	float CurrentPoise = 50.0f;
 	float LastRuneLanceTime = -10.0f;
+	float SuperCharge = 35.0f;
 
 	FVector PrevBladeBase = FVector::ZeroVector;
 	FVector PrevBladeTip = FVector::ZeroVector;

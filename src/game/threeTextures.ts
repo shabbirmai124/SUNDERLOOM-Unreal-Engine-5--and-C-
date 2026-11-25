@@ -106,8 +106,8 @@ function createObsidianFloorMaps(anisotropy: number): {
         bCtx.lineWidth = 4;
         bCtx.strokeRect(x + 1, y + 1, w - 2, h - 2);
 
-        // Damp vs dry stone roughness variation
-        const roughVal = Math.round(115 + shade * 70);
+        // Matte weathered dry-stone roughness variation (zero wet mirror shine)
+        const roughVal = Math.round(212 + shade * 36);
         rCtx.fillStyle = `rgb(${roughVal}, ${roughVal}, ${roughVal})`;
         rCtx.fillRect(x + 2, y + 2, w - 4, h - 4);
 
@@ -126,7 +126,7 @@ function createObsidianFloorMaps(anisotropy: number): {
           bCtx.arc(px, py, rad * 0.85, 0, Math.PI * 2);
           bCtx.fill();
 
-          rCtx.fillStyle = k % 4 === 0 ? 'rgba(52, 52, 52, 0.35)' : 'rgba(195, 195, 195, 0.25)';
+          rCtx.fillStyle = k % 4 === 0 ? 'rgba(195, 195, 195, 0.3)' : 'rgba(240, 240, 240, 0.35)';
           rCtx.beginPath();
           rCtx.arc(px, py, rad * 1.4, 0, Math.PI * 2);
           rCtx.fill();
@@ -138,11 +138,11 @@ function createObsidianFloorMaps(anisotropy: number): {
     }
   }
 
-  // Tarnished antique bronze hairline expansion seam
-  aCtx.strokeStyle = 'rgba(168, 128, 72, 0.26)';
+  // Tarnished matte antique bronze hairline expansion seam
+  aCtx.strokeStyle = 'rgba(150, 118, 72, 0.22)';
   aCtx.lineWidth = 3;
   aCtx.strokeRect(2, 2, size - 4, size - 4);
-  rCtx.strokeStyle = '#505050';
+  rCtx.strokeStyle = '#d6d6d6';
   rCtx.lineWidth = 4;
   rCtx.strokeRect(2, 2, size - 4, size - 4);
 
@@ -210,7 +210,7 @@ function createVaultWallMaps(anisotropy: number): {
         bCtx.fillStyle = `rgb(${bVal}, ${bVal}, ${bVal})`;
         bCtx.fillRect(x + 2, y + 2, w - 4, h - 4);
 
-        const rVal = Math.round(150 + shade * 60);
+        const rVal = Math.round(215 + shade * 34);
         rCtx.fillStyle = `rgb(${rVal}, ${rVal}, ${rVal})`;
         rCtx.fillRect(x + 2, y + 2, w - 4, h - 4);
       };
@@ -221,12 +221,12 @@ function createVaultWallMaps(anisotropy: number): {
     }
   }
 
-  // Tarnished hammered bronze architectural frieze band
+  // Tarnished matte hammered bronze architectural frieze band (zero glossy reflection)
   aCtx.fillStyle = '#473620';
   aCtx.fillRect(0, 34, size, 16);
-  aCtx.fillStyle = '#8c693b';
+  aCtx.fillStyle = '#7d5f37';
   aCtx.fillRect(0, 39, size, 6);
-  rCtx.fillStyle = '#606060';
+  rCtx.fillStyle = '#d4d4d4';
   rCtx.fillRect(0, 34, size, 16);
 
   return {
@@ -254,16 +254,16 @@ function createBrushedMetalMaps(anisotropy: number): {
 
   aCtx.fillStyle = '#3b3937';
   aCtx.fillRect(0, 0, size, size);
-  rCtx.fillStyle = '#888888';
+  rCtx.fillStyle = '#dcdcdc';
   rCtx.fillRect(0, 0, size, size);
 
   for (let i = 0; i < 420; i++) {
     const y = seededNoise(i, 1, 9) * size;
-    const alpha = 0.04 + seededNoise(i, 2, 9) * 0.1;
+    const alpha = 0.04 + seededNoise(i, 2, 9) * 0.08;
     aCtx.fillStyle = i % 2 === 0 ? `rgba(215, 205, 190, ${alpha})` : `rgba(12, 10, 9, ${alpha})`;
     aCtx.fillRect(0, y, size, 1.4);
 
-    const rv = Math.round(92 + seededNoise(i, 3, 9) * 85);
+    const rv = Math.round(208 + seededNoise(i, 3, 9) * 38);
     rCtx.fillStyle = `rgb(${rv}, ${rv}, ${rv})`;
     rCtx.fillRect(0, y, size, 1.4);
   }

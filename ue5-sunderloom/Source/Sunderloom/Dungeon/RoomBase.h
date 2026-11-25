@@ -52,6 +52,8 @@ protected:
 
 	void SpawnWaveAfterTelegraph();
 	void SetRunicGatesLocked(bool bLocked);
+	void SetBattlefieldWallCutaway(bool bCutaway);
+	void ApplyMatteDarkFantasyCalibration();
 	void SpawnThreeUniqueRelicPedestals();
 
 	UFUNCTION()
@@ -84,6 +86,9 @@ protected:
 private:
 	UPROPERTY()
 	TObjectPtr<UDungeonThemeDataAsset> ActiveTheme;
+
+	UPROPERTY()
+	TWeakObjectPtr<AWardenCharacter> ActiveWarden;
 
 	UPROPERTY()
 	TArray<TObjectPtr<AActor>> ConnectedRunicGates;

@@ -1,14 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import type { HudSnapshot } from '../game/engine';
+import type { CameraPreset } from '../game/settings';
 import type { GeneratedDungeon } from '../game/types';
 
 interface GameHudProps {
   hud: HudSnapshot;
   dungeon: GeneratedDungeon;
   playerPos: { x: number; y: number };
+  cameraPreset: CameraPreset;
   muted: boolean;
   showMinimap: boolean;
+  mapExpanded: boolean;
   floorBanner: { floor: number; seed: number } | null;
+  onCycleCamera: () => void;
+  onToggleMapExpanded: () => void;
+  onTriggerSuper: () => void;
   onToggleMute: () => void;
   onOpenSettings: () => void;
   onPause: () => void;
@@ -18,15 +24,21 @@ export const GameHud: React.FC<GameHudProps> = ({
   hud,
   dungeon,
   playerPos,
+  cameraPreset,
   muted,
   showMinimap,
+  mapExpanded,
   floorBanner,
+  onCycleCamera,
+  onToggleMapExpanded,
+  onTriggerSuper,
   onToggleMute,
   onOpenSettings,
   onPause,
 }) => {
   const trailRef = useRef<HTMLDivElement | null>(null);
   const hpPct = Math.max(0, Math.min(100, (hud.hp / Math.max(1, hud.maxHp)) * 100));
+  const superReady = hud.superCharge >= 100;
 
   useEffect(() => {
     const el = trailRef.current;
@@ -39,63 +51,154 @@ export const GameHud: React.FC<GameHudProps> = ({
 
   // Compute minimap viewport transform
   const { minX, minY, maxX, maxY } = dungeon.bounds;
-  const spanX = Math.max(1, maxX - minX + 400);
-  const spanY = Math.max(1, maxY - minY + 400);
-  const mapW = 148;
-  const mapH = 112;
-  const mapScale = Math.min((mapW - 16) / spanX, (mapH - 16) / spanY);
-  const mapOffX = (mapW - spanX * mapScale) / 2 - (minX - 200) * mapScale;
-  const mapOffY = (mapH - spanY * mapScale) / 2 - (minY - 200) * mapScale;
+  const spanX = Math.max(1, maxX - minX + 500);
+  const spanY = Math.max(1, maxY - minY + 500);
+
+  const renderVaultMapSvg = (mapW: number, mapH: number) => {
+    const mapScale = Math.min((mapW - 20) / spanX, (mapH - 20) / spanY);
+    const mapOffX = (mapW - spanX * mapScale) / 2 - (minX - 250) * mapScale;
+    const mapOffY = (mapH - spanY * mapScale) / 2 - (minY - 250) * mapScale;
+
+    return (
+      <svg width={mapW} height={mapH} viewBox={`0 0 ${mapW} ${mapH}`} aria-label="Dungeon map">
+        {dungeon.rooms.map((r) => {
+          const rx = r.x * mapScale + mapOffX;
+          const ry = r.y * mapScale + mapOffY;
+          const rw = Math.max(4, r.width * mapScale);
+          const rh = Math.max(4, r.height * mapScale);
+          const fill =
+            r.type === 'Boss'
+              ? '#4A1917'
+              : r.type === 'Treasure'
+                ? '#453219'
+                : r.state === 'Cleared'
+                  ? '#28221D'
+                  : '#181412';
+          const stroke =
+            r.type === 'Boss'
+              ? '#C4342D'
+              : r.type === 'Treasure'
+                ? '#E0B46A'
+                : r.runicGatesLocked
+                  ? '#D96B27'
+                  : '#574A3D';
+          return (
+            <rect
+              key={r.id}
+              x={rx}
+              y={ry}
+              width={rw}
+              height={rh}
+              fill={fill}
+              stroke={stroke}
+              strokeWidth={mapW > 220 ? 1.8 : 1.15}
+            />
+          );
+        })}
+        <circle
+          cx={playerPos.x * mapScale + mapOffX}
+          cy={playerPos.y * mapScale + mapOffY}
+          r={mapW > 220 ? 5.2 : 3.4}
+          fill="#EAE3D5"
+          stroke="#D96B27"
+          strokeWidth={1.5}
+        />
+      </svg>
+    );
+  };
+
+  const viewLabel =
+    cameraPreset === 'ThirdPerson'
+      ? '3rd Person'
+      : cameraPreset === 'FirstPerson'
+        ? 'FPS'
+        : cameraPreset === 'TopDown'
+          ? 'Top-Down'
+          : 'Cinematic';
 
   return (
     <div className="fixed inset-0 z-10 pointer-events-none select-none">
-      {/* Top-Left Perimeter Cluster: Warden Vitality + Floor Record */}
-      <div className="absolute top-5 left-5 flex flex-col gap-2.5 max-w-[440px]">
-        <div className="flex items-baseline justify-between gap-4 w-[264px]">
+      {/* Crisp Minimal Tactical FPS Crosshair (Valorant-style) exclusively in First-Person View */}
+      {cameraPreset === 'FirstPerson' && !mapExpanded && (
+        <div
+          aria-hidden="true"
+          data-testid="fps-crosshair"
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+        >
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+            <line x1="13" y1="3" x2="13" y2="9" stroke="#EAE3D5" strokeWidth="1.8" />
+            <line x1="13" y1="17" x2="13" y2="23" stroke="#EAE3D5" strokeWidth="1.8" />
+            <line x1="3" y1="13" x2="9" y2="13" stroke="#EAE3D5" strokeWidth="1.8" />
+            <line x1="17" y1="13" x2="23" y2="13" stroke="#EAE3D5" strokeWidth="1.8" />
+            <circle cx="13" cy="13" r="1.4" fill="#E0B46A" />
+          </svg>
+        </div>
+      )}
+      {/* Top-Left Perimeter Cluster: Warden Vitality + Phase Step + Sunder Nova Super + Floor Record */}
+      <div className="absolute top-5 left-5 flex flex-col gap-2 max-w-[460px]">
+        <div className="flex items-baseline justify-between gap-4 w-[276px]">
           <div className="flex items-baseline gap-2">
-            <span className="text-[11px] font-semibold tracking-widest text-slate-400">HP</span>
+            <span className="text-[11px] font-semibold tracking-widest text-[#A69B8D]">HP</span>
             <span
               data-testid="hud-hp"
-              className="text-2xl font-bold text-slate-100 hud-numeral font-mono-tabular leading-none"
+              className="text-2xl font-bold text-[#EAE3D5] hud-numeral font-mono-tabular leading-none"
             >
               {hud.hp}
             </span>
-            <span className="text-xs text-slate-400 font-mono-tabular">/ {hud.maxHp}</span>
+            <span className="text-xs text-[#A69B8D] font-mono-tabular">/ {hud.maxHp}</span>
           </div>
-          <span className="text-xs font-mono-tabular text-cyan-300 whitespace-nowrap">
-            {hud.isInvulnerable ? 'PHASE I-FRAME' : hud.dodgeReadyRatio >= 0.99 ? 'STEP READY' : 'RECHARGING'}
+          <span className="text-[11px] font-mono-tabular text-[#E0B46A] whitespace-nowrap">
+            {hud.isInvulnerable ? 'PHASE WARD' : hud.dodgeReadyRatio >= 0.99 ? 'STEP READY' : 'RECHARGING'}
           </span>
         </div>
 
-        {/* Obsidian Vitality Bar with delayed chip-damage ghost bar */}
-        <div className="w-[264px] h-3 bg-[#090B0E]/90 border border-[#2D384B] overflow-hidden relative shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
+        {/* Blood-Crimson Vitality Bar with bone-ivory delayed chip-damage bar */}
+        <div className="w-[276px] h-3 bg-[#120F0D]/92 border border-[#473B2F] overflow-hidden relative shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
           <div
             ref={trailRef}
-            className="absolute inset-y-0 left-0 bg-slate-200/75 transition-[width] duration-300"
+            className="absolute inset-y-0 left-0 bg-[#EAE3D5]/75 transition-[width] duration-300"
             style={{ width: `${hpPct}%` }}
           />
           <div
-            className="absolute inset-y-0 left-0 bg-[#DC2626] transition-[width] duration-100"
+            className="absolute inset-y-0 left-0 bg-[#B82C26] transition-[width] duration-100"
             style={{ width: `${hpPct}%` }}
           />
         </div>
 
-        {/* Phase Step cooldown thin bar */}
-        <div className="w-[180px] h-1.5 bg-[#090B0E]/90 border border-[#232D3D] overflow-hidden">
-          <div
-            className="h-full bg-[#22D3EE]"
-            style={{ width: `${Math.round(hud.dodgeReadyRatio * 100)}%` }}
-          />
+        {/* Twin Compact Gauges: Phase Step Cooldown + Sunder Nova Super */}
+        <div className="flex items-center gap-2.5 w-[276px]">
+          <div className="flex-1 h-1.5 bg-[#120F0D]/92 border border-[#382E25] overflow-hidden">
+            <div
+              className="h-full bg-[#C89B54]"
+              style={{ width: `${Math.round(hud.dodgeReadyRatio * 100)}%` }}
+            />
+          </div>
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={!superReady}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onTriggerSuper();
+            }}
+            className={`pointer-events-auto flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-mono-tabular border rounded-sm transition-colors ${
+              superReady
+                ? 'bg-[#C89B54] text-[#0E0B0A] border-[#F0CF8E] font-bold cursor-pointer'
+                : 'bg-[#14110F]/90 text-[#A69B8D] border-[#382E25] cursor-default'
+            }`}
+          >
+            <span>{superReady ? 'R · NOVA READY' : `NOVA ${hud.superCharge}%`}</span>
+          </button>
         </div>
 
         {/* Clean unboxed single-line tabular run metadata */}
-        <div className="flex items-center gap-2.5 text-xs font-mono-tabular text-slate-300 whitespace-nowrap drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+        <div className="flex items-center gap-2.5 text-xs font-mono-tabular text-[#D6CCBE] whitespace-nowrap drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
           <span data-testid="hud-floor">Floor {hud.floor}</span>
-          <span aria-hidden="true" className="text-slate-500">·</span>
+          <span aria-hidden="true" className="text-[#6E6254]">·</span>
           <span>Rooms {hud.roomsCleared}/{hud.totalCombatRooms}</span>
-          <span aria-hidden="true" className="text-slate-500">·</span>
-          <span className="text-amber-400">{hud.aetherThreads} Aether</span>
-          <span aria-hidden="true" className="text-slate-500">·</span>
+          <span aria-hidden="true" className="text-[#6E6254]">·</span>
+          <span className="text-[#E0B46A]">{hud.aetherThreads} Aether</span>
+          <span aria-hidden="true" className="text-[#6E6254]">·</span>
           <span>Relics {hud.relicCount}</span>
         </div>
       </div>
@@ -104,25 +207,38 @@ export const GameHud: React.FC<GameHudProps> = ({
       {hud.bossName && (
         <div className="absolute top-5 left-1/2 -translate-x-1/2 w-[min(460px,52vw)] flex flex-col items-center gap-1.5">
           <div className="flex items-center justify-between w-full text-xs">
-            <span className="font-display font-bold tracking-widest text-slate-100 drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+            <span className="font-display font-bold tracking-widest text-[#EAE3D5] drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
               {hud.bossName}
             </span>
-            <span className="font-mono-tabular text-amber-400">
+            <span className="font-mono-tabular text-[#E0B46A]">
               Phase {hud.bossPhase} · {hud.bossHp} / {hud.bossMaxHp}
             </span>
           </div>
-          <div className="w-full h-3.5 bg-[#090B0E]/95 border border-[#7F1D1D] overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
+          <div className="w-full h-3.5 bg-[#110D0C]/95 border border-[#6E2622] overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.85)]">
             <div
-              className="h-full bg-[#EF4444] transition-[width] duration-100"
+              className="h-full bg-[#B82C26] transition-[width] duration-100"
               style={{ width: `${Math.max(0, Math.min(100, (hud.bossHp / Math.max(1, hud.bossMaxHp)) * 100))}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* Top-Right Perimeter Cluster: Settings, Audio, Pause + Geometric Dungeon Minimap */}
+      {/* Top-Right Perimeter Cluster: Camera View Toggle (V), Settings, Audio, Pause + Clickable Minimap */}
       <div className="absolute top-5 right-5 flex flex-col items-end gap-2.5">
         <div className="flex items-center gap-2 pointer-events-auto">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Switch Camera View"
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onCycleCamera();
+            }}
+            className="h-9 px-3 bg-[#151210]/92 border border-[#42362A] text-xs font-medium text-[#EAE3D5] hover:border-[#C89B54] hover:text-white rounded-sm transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            View: {viewLabel} (V)
+          </button>
+
           <button
             type="button"
             tabIndex={-1}
@@ -131,7 +247,7 @@ export const GameHud: React.FC<GameHudProps> = ({
               e.currentTarget.blur();
               onOpenSettings();
             }}
-            className="w-9 h-9 flex items-center justify-center bg-[#0E131B]/92 border border-[#263142] text-slate-200 hover:border-[#22D3EE] hover:text-white rounded transition-colors cursor-pointer"
+            className="w-9 h-9 flex items-center justify-center bg-[#151210]/92 border border-[#42362A] text-[#EAE3D5] hover:border-[#C89B54] hover:text-white rounded-sm transition-colors cursor-pointer"
           >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3" />
@@ -147,7 +263,7 @@ export const GameHud: React.FC<GameHudProps> = ({
               e.currentTarget.blur();
               onToggleMute();
             }}
-            className="w-9 h-9 flex items-center justify-center bg-[#0E131B]/92 border border-[#263142] text-slate-200 hover:border-[#22D3EE] rounded transition-colors cursor-pointer"
+            className="w-9 h-9 flex items-center justify-center bg-[#151210]/92 border border-[#42362A] text-[#EAE3D5] hover:border-[#C89B54] rounded-sm transition-colors cursor-pointer"
           >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
               {muted ? (
@@ -174,7 +290,7 @@ export const GameHud: React.FC<GameHudProps> = ({
               e.currentTarget.blur();
               onPause();
             }}
-            className="w-9 h-9 flex items-center justify-center bg-[#0E131B]/92 border border-[#263142] text-slate-200 hover:border-[#22D3EE] rounded transition-colors cursor-pointer"
+            className="w-9 h-9 flex items-center justify-center bg-[#151210]/92 border border-[#42362A] text-[#EAE3D5] hover:border-[#C89B54] rounded-sm transition-colors cursor-pointer"
           >
             <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
               <rect x="6" y="5" width="4" height="14" />
@@ -183,66 +299,66 @@ export const GameHud: React.FC<GameHudProps> = ({
           </button>
         </div>
 
-        {/* Live Stitched Dungeon Minimap */}
+        {/* Clickable Live Stitched Dungeon Minimap */}
         {showMinimap && (
-          <div className="bg-[#090C11]/92 border border-[#243040] p-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.75)]">
-            <svg width={mapW} height={mapH} viewBox={`0 0 ${mapW} ${mapH}`} aria-label="Dungeon minimap">
-              {dungeon.rooms.map((r) => {
-                const rx = r.x * mapScale + mapOffX;
-                const ry = r.y * mapScale + mapOffY;
-                const rw = Math.max(4, r.width * mapScale);
-                const rh = Math.max(4, r.height * mapScale);
-                const fill =
-                  r.type === 'Boss'
-                    ? '#451A1F'
-                    : r.type === 'Treasure'
-                      ? '#3D2E12'
-                      : r.state === 'Cleared'
-                        ? '#1B2736'
-                        : '#121822';
-                const stroke =
-                  r.type === 'Boss'
-                    ? '#EF4444'
-                    : r.type === 'Treasure'
-                      ? '#F59E0B'
-                      : r.runicGatesLocked
-                        ? '#22D3EE'
-                        : '#334155';
-                return (
-                  <rect
-                    key={r.id}
-                    x={rx}
-                    y={ry}
-                    width={rw}
-                    height={rh}
-                    fill={fill}
-                    stroke={stroke}
-                    strokeWidth={1.2}
-                  />
-                );
-              })}
-              {/* Live Warden position */}
-              <circle
-                cx={playerPos.x * mapScale + mapOffX}
-                cy={playerPos.y * mapScale + mapOffY}
-                r={3.2}
-                fill="#22D3EE"
-              />
-            </svg>
-            <div className="flex items-center justify-between text-[10px] font-mono-tabular text-slate-400 mt-1 px-0.5">
-              <span>Floor {hud.floor}</span>
-              <span>{hud.activeRoomLocked ? 'LOCKED' : hud.activeRoomType}</span>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Toggle Full Dungeon Map"
+            onClick={(e) => {
+              e.currentTarget.blur();
+              onToggleMapExpanded();
+            }}
+            className="pointer-events-auto bg-[#110E0C]/92 border border-[#3E3328] hover:border-[#C89B54] p-1.5 shadow-[0_2px_10px_rgba(0,0,0,0.8)] transition-colors cursor-pointer text-left"
+          >
+            {renderVaultMapSvg(164, 124)}
+            <div className="flex items-center justify-between text-[10px] font-mono-tabular text-[#A69B8D] mt-1 px-0.5">
+              <span>Tab · {dungeon.rooms.length} Rooms</span>
+              <span className="text-[#E0B46A]">{hud.activeRoomLocked ? 'LOCKED' : hud.activeRoomType}</span>
             </div>
-          </div>
+          </button>
         )}
       </div>
 
+      {/* Expanded Full-Vault Map Overlay (Tab or Click Minimap) */}
+      {mapExpanded && (
+        <div className="fixed inset-0 z-25 flex items-center justify-center bg-[#0C0A09]/82 pointer-events-auto p-6">
+          <div className="bg-[#14110F] border border-[#4B3D2E] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.92)] flex flex-col items-center">
+            <div className="w-full flex items-center justify-between mb-3">
+              <div>
+                <div className="font-display text-lg font-bold tracking-[0.2em] text-[#EAE3D5]">
+                  THE SHIFTING VAULT · FLOOR {hud.floor}
+                </div>
+                <div className="text-xs font-mono-tabular text-[#A69B8D]">
+                  {dungeon.rooms.length} Interconnected Chambers · Press Tab to Close
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onToggleMapExpanded}
+                className="px-3 py-1.5 bg-[#211B17] border border-[#4B3D2E] text-xs text-[#EAE3D5] hover:border-[#C89B54] rounded-sm cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+            <div className="bg-[#0D0B0A] border border-[#2F261E] p-3">
+              {renderVaultMapSvg(540, 380)}
+            </div>
+            <div className="flex items-center gap-6 text-xs font-mono-tabular text-[#B5A998] mt-3">
+              <span>Ivory Dot: Warden</span>
+              <span className="text-[#E0B46A]">Gold: Treasure Reliquary</span>
+              <span className="text-[#C4342D]">Crimson: Boss Citadel</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Contextual Bottom-Center Interaction Plaque (Upgrade Pedestal or Descent Portal) */}
       {hud.promptText && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#0B0F16]/95 border border-[#22D3EE]/70 px-5 py-2.5 text-center shadow-[0_6px_20px_rgba(0,0,0,0.85)]">
-          <div className="text-sm font-semibold text-slate-100">{hud.promptText}</div>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#14100E]/95 border border-[#C89B54]/80 px-5 py-2.5 text-center shadow-[0_6px_22px_rgba(0,0,0,0.9)]">
+          <div className="text-sm font-semibold text-[#EAE3D5]">{hud.promptText}</div>
           {hud.promptSubtext && (
-            <div className="text-xs font-mono-tabular text-amber-300 mt-0.5">{hud.promptSubtext}</div>
+            <div className="text-xs font-mono-tabular text-[#E0B46A] mt-0.5">{hud.promptSubtext}</div>
           )}
         </div>
       )}
@@ -250,11 +366,11 @@ export const GameHud: React.FC<GameHudProps> = ({
       {/* Brief Floor Transition Banner */}
       {floorBanner && (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 text-center">
-          <div className="font-display text-2xl font-bold tracking-[0.25em] text-slate-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]">
+          <div className="font-display text-2xl font-bold tracking-[0.25em] text-[#EAE3D5] drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
             FLOOR {floorBanner.floor}
           </div>
-          <div className="text-xs font-mono-tabular text-slate-400 mt-1">
-            The Obsidian Weave · Seed {floorBanner.seed}
+          <div className="text-xs font-mono-tabular text-[#C89B54] mt-1">
+            The Obsidian Weave · {dungeon.rooms.length} Chambers
           </div>
         </div>
       )}

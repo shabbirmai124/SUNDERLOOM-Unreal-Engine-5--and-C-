@@ -3,9 +3,12 @@
 #include "Character/WardenCharacter.h"
 #include "Character/LoombornEnemyBase.h"
 #include "Components/HealthComponent.h"
+#include "Core/SunderloomGameUserSettings.h"
 #include "Progression/UpgradePedestal.h"
 #include "Components/BoxComponent.h"
 #include "Components/ArrowComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
 #include "Sunderloom.h"
 
@@ -36,6 +39,8 @@ ARoomBase::ARoomBase()
 void ARoomBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	ApplyMatteDarkFantasyCalibration();
 
 	if (IsValid(EncounterTriggerBox))
 	{
@@ -90,7 +95,8 @@ void ARoomBase::RegisterRunicGate(AActor* GateActor)
 
 void ARoomBase::HandleEncounterTriggerOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (RoomState != ERoomState::Dormant || !Cast<AWardenCharacter>(OtherActor))
+	AWardenCharacter* Warden = Cast<AWardenCharacter>(OtherActor);
+	if (RoomState != ERoomState::Dormant || !IsValid(Warden))
 	{
 		return;
 	}
@@ -103,9 +109,18 @@ void ARoomBase::HandleEncounterTriggerOverlap(UPrimitiveComponent* OverlappedCom
 		return;
 	}
 
-	// Dormant -> LockedCombat transition
+	// Dormant -> LockedCombat transition + Battlefield Clear Room View activation
+	ActiveWarden = Warden;
 	RoomState = ERoomState::LockedCombat;
 	SetRunicGatesLocked(true);
+	Warden->SetInActiveBattleRoom(true);
+
+	const USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings();
+	const bool bClearRoom = !Settings || Settings->bBattlefieldClearView;
+	if (bClearRoom && Warden->GetCameraPreset() != ECameraViewPreset::FirstPerson)
+	{
+		SetBattlefieldWallCutaway(true);
+	}
 
 	// 1.0-second portal spawn telegraph before materializing Loomborn wave
 	if (UWorld* World = GetWorld())
@@ -181,6 +196,11 @@ void ARoomBase::HandleSpawnedEnemyDeath(AActor* DeadEnemy)
 	{
 		RoomState = ERoomState::Cleared;
 		SetRunicGatesLocked(false);
+		SetBattlefieldWallCutaway(false);
+		if (ActiveWarden.IsValid())
+		{
+			ActiveWarden->SetInActiveBattleRoom(false);
+		}
 		if (RoomType == ERoomType::Combat)
 		{
 			SpawnThreeUniqueRelicPedestals();
@@ -197,6 +217,62 @@ void ARoomBase::SetRunicGatesLocked(bool bLocked)
 		{
 			Gate->SetActorHiddenInGame(!bLocked);
 			Gate->SetActorEnableCollision(bLocked);
+		}
+	}
+}
+
+void ARoomBase::SetBattlefieldWallCutaway(bool bCutaway)
+{
+	TArray<UStaticMeshComponent*> Meshes;
+	GetComponents<UStaticMeshComponent>(Meshes);
+	for (UStaticMeshComponent* Mesh : Meshes)
+	{
+		if (IsValid(Mesh) && Mesh->ComponentHasTag(FName(TEXT("CutawayWall"))))
+		{
+			FVector Scale = Mesh->GetRelativeScale3D();
+			Scale.Z = bCutaway ? 0.12f : 1.0f;
+			Mesh->SetRelativeScale3D(Scale);
+		}
+	}
+}
+
+void ARoomBase::ApplyMatteDarkFantasyCalibration()
+{
+	// Enforce matte weathered stone & tarnished bronze PBR values (zero glossy specular glare or bloom clipping)
+	TArray<UStaticMeshComponent*> Meshes;
+	GetComponents<UStaticMeshComponent>(Meshes);
+	for (UStaticMeshComponent* Mesh : Meshes)
+	{
+		if (!IsValid(Mesh)) continue;
+		const int32 MatCount = Mesh->GetNumMaterials();
+		for (int32 Slot = 0; Slot < MatCount; ++Slot)
+		{
+			if (UMaterialInterface* BaseMat = Mesh->GetMaterial(Slot))
+			{
+				UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(BaseMat);
+				if (!IsValid(MID))
+				{
+					MID = Mesh->CreateDynamicMaterialInstance(Slot, BaseMat);
+				}
+				if (IsValid(MID))
+				{
+					float RoughnessVal = 0.0f;
+					if (MID->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Roughness")), RoughnessVal) && RoughnessVal < 0.84f)
+					{
+						MID->SetScalarParameterValue(TEXT("Roughness"), 0.88f);
+					}
+					float MetallicVal = 0.0f;
+					if (MID->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Metallic")), MetallicVal) && MetallicVal > 0.24f)
+					{
+						MID->SetScalarParameterValue(TEXT("Metallic"), 0.18f);
+					}
+					float SpecularVal = 0.0f;
+					if (MID->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Specular")), SpecularVal) && SpecularVal > 0.25f)
+					{
+						MID->SetScalarParameterValue(TEXT("Specular"), 0.20f);
+					}
+				}
+			}
 		}
 	}
 }

@@ -100,12 +100,16 @@ export class SunderloomThreeViewport {
   private hazardGeo: THREE.RingGeometry;
   private spawnGeo: THREE.RingGeometry;
 
-  // Dynamic Orbit + Auto-Follow 3D SpringArm Camera state
+  // Dynamic Orbit + Auto-Follow + First-Person (Valorant FPS) Camera state
   public cameraYaw = 0;
+  public cameraPitch = -0.04;
   private manualOrbitCooldown = 0;
+  private snapCameraNextFrame = true;
   private camPos = new THREE.Vector3(0, 8, 10);
   private camLook = new THREE.Vector3(0, 1.0, 0);
   private settings: GameSettings;
+  private fpsViewModel: THREE.Group;
+  private fpsBladePivot: THREE.Group;
 
   constructor(container: HTMLElement, initialSettings: GameSettings) {
     this.settings = { ...initialSettings };
@@ -143,38 +147,39 @@ export class SunderloomThreeViewport {
     container.appendChild(this.overlayCanvas);
     this.overlayCtx = this.overlayCanvas.getContext('2d')!;
 
-    // 3. Scene, Warm Charred-Ash Fog & Studio RoomEnvironment IBL
+    // 3. Scene, Balanced Warm-Ash Fog & Matte RoomEnvironment Fill
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0c0a09);
-    this.scene.fog = new THREE.FogExp2(0x0c0a09, 0.019);
+    this.scene.background = new THREE.Color(0x120f0d);
+    this.scene.fog = new THREE.FogExp2(0x120f0d, 0.013);
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const roomEnv = new RoomEnvironment();
     this.scene.environment = pmrem.fromScene(roomEnv, 0.04).texture;
+    this.scene.environmentIntensity = 0.48;
     roomEnv.dispose();
     pmrem.dispose();
 
     // 4. Perspective Third-Person Camera
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, width / height, 0.25, 140);
 
-    // 5. Optional GPU Bloom Post-Processing (strictly skipped on Software WebGL)
+    // 5. Optional Restrained GPU Bloom Post-Processing (high threshold 1.45 prevents shiny metal clipping)
     if (!this.isSoftwareGl) {
       this.composer = new EffectComposer(this.renderer);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
-      this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.28, 0.42, 0.85);
+      this.bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.08, 0.25, 1.45);
       this.composer.addPass(this.bloomPass);
     }
 
-    // 6. Procedural AAA Dark-Fantasy PBR Textures & Shared Composite Materials
+    // 6. Procedural AAA Dark-Fantasy PBR Textures & Shared Matte Materials
     const maxAniso = this.renderer.capabilities.getMaxAnisotropy();
     this.textures = createSunderloomTextureSuite(maxAniso);
     this.rigMats = createSharedRigMaterials(this.textures);
 
-    // 7. Authentic AAA Dark-Fantasy Lighting Rig (Warm Ash/Amber vs Deep Iron Shadow)
-    this.hemiLight = new THREE.HemisphereLight(0x8a7968, 0x1a1411, 0.62);
+    // 7. Bright, High-Contrast Matte Dark-Fantasy Lighting Rig (Clear Readability, Zero Glossy Glare)
+    this.hemiLight = new THREE.HemisphereLight(0xb8a996, 0x3d332c, 1.05);
     this.scene.add(this.hemiLight);
 
-    this.keyLight = new THREE.DirectionalLight(0xffd8ab, 2.05);
+    this.keyLight = new THREE.DirectionalLight(0xffe4c2, 1.65);
     this.keyLight.position.set(10, 18, 8);
     this.keyLight.castShadow = !this.isSoftwareGl && this.settings.shadowsEnabled;
     this.keyLight.shadow.mapSize.set(2048, 2048);
@@ -191,12 +196,12 @@ export class SunderloomThreeViewport {
     this.scene.add(this.keyLight.target);
 
     // Warm Forge-Ember Rim Bounce around the Unbound Warden
-    this.wardenRimLight = new THREE.PointLight(0xe0a15a, 5.2, 10, 1.8);
+    this.wardenRimLight = new THREE.PointLight(0xeab36e, 4.2, 11.5, 1.75);
     this.scene.add(this.wardenRimLight);
 
-    // 4 Dynamic Nearest-Brazier Flickering Fire PointLights
+    // 4 Dynamic Nearest-Brazier Flickering Fire PointLights (bright warm hearth light, matte surfaces never glare)
     for (let i = 0; i < 4; i++) {
-      const pt = new THREE.PointLight(0xff7e26, 15, 16, 1.65);
+      const pt = new THREE.PointLight(0xff903d, 13.5, 17, 1.65);
       this.scene.add(pt);
       this.brazierLights.push(pt);
     }
@@ -245,7 +250,38 @@ export class SunderloomThreeViewport {
     this.superNovaRing.visible = false;
     this.scene.add(this.superNovaRing);
 
-    // 9. Cinematic Dark-Fantasy Title Cathedral Sanctuary (zero foreground obstacles!)
+    // 9. First-Person Tactical Runeblade & Ember Gauntlet Viewmodel (attached to Camera for FPS mode)
+    this.fpsViewModel = new THREE.Group();
+    this.fpsBladePivot = new THREE.Group();
+    this.fpsBladePivot.position.set(0.42, -0.36, -0.68);
+    this.fpsBladePivot.rotation.set(0.08, -0.18, 0.08);
+    const fpsForearm = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.36), this.rigMats.blackenedSteel);
+    fpsForearm.position.set(0.02, -0.08, 0.14);
+    const fpsCuff = new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.135, 0.09), this.rigMats.antiqueGold);
+    fpsCuff.position.set(0.01, -0.05, -0.03);
+    const fpsHand = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.11), this.rigMats.blackenedSteel);
+    fpsHand.position.set(0, -0.01, -0.1);
+    const fpsPommel = new THREE.Mesh(new THREE.OctahedronGeometry(0.042, 0), this.rigMats.antiqueGold);
+    fpsPommel.position.set(0, -0.09, -0.07);
+    const fpsGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 0.24, 8), this.rigMats.forgedIron);
+    fpsGrip.rotation.x = -0.22;
+    fpsGrip.position.set(0, 0.02, -0.11);
+    const fpsGuard = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.034, 0.048), this.rigMats.antiqueGold);
+    fpsGuard.rotation.x = -0.22;
+    fpsGuard.position.set(0, 0.13, -0.14);
+    const fpsBlade = new THREE.Mesh(new THREE.BoxGeometry(0.056, 0.72, 0.018), this.rigMats.blackenedSteel);
+    fpsBlade.rotation.x = -0.22;
+    fpsBlade.position.set(0, 0.48, -0.22);
+    const fpsEdge = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.62, 0.024), this.rigMats.emberGlow);
+    fpsEdge.rotation.x = -0.22;
+    fpsEdge.position.set(0, 0.48, -0.22);
+    this.fpsBladePivot.add(fpsForearm, fpsCuff, fpsHand, fpsPommel, fpsGrip, fpsGuard, fpsBlade, fpsEdge);
+    this.fpsViewModel.add(this.fpsBladePivot);
+    this.fpsViewModel.visible = false;
+    this.camera.add(this.fpsViewModel);
+    this.scene.add(this.camera);
+
+    // 10. Cinematic Dark-Fantasy Title Cathedral Sanctuary (zero foreground obstacles!)
     const titleBuilt = this.buildTitleSanctuary();
     this.titleGroup = titleBuilt.group;
     this.titleWarden = titleBuilt.warden;
@@ -280,12 +316,13 @@ export class SunderloomThreeViewport {
     const floor = new THREE.Mesh(
       new THREE.CylinderGeometry(16, 16.5, 0.5, 28),
       new THREE.MeshStandardMaterial({
-        color: 0x8f887e,
+        color: 0xa8a095,
         map: floorTex,
         bumpMap: floorBump,
         bumpScale: 0.07,
-        roughness: 0.68,
-        metalness: 0.14,
+        roughness: 0.9,
+        metalness: 0.04,
+        envMapIntensity: 0.25,
       }),
     );
     floor.position.y = -0.25;
@@ -309,12 +346,13 @@ export class SunderloomThreeViewport {
     group.add(sigil);
 
     const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x8a8076,
+      color: 0xa69c90,
       map: this.textures.wallAlbedo,
       bumpMap: this.textures.wallBump,
       bumpScale: 0.09,
-      roughness: 0.82,
-      metalness: 0.14,
+      roughness: 0.92,
+      metalness: 0.04,
+      envMapIntensity: 0.25,
     });
 
     // Cathedral perimeter columns behind the Warden
@@ -398,21 +436,40 @@ export class SunderloomThreeViewport {
   }
 
   public applySettings(next: GameSettings): void {
+    if (next.cameraPreset !== this.settings.cameraPreset) {
+      this.snapCameraNextFrame = true;
+    }
     this.settings = { ...next };
-    this.camera.fov = next.fov;
+    const effectiveFov = next.cameraPreset === 'FirstPerson' ? Math.max(76, next.fov + 18) : next.fov;
+    this.camera.fov = effectiveFov;
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(this.computePixelRatio());
     const allowShadows = !this.isSoftwareGl && next.shadowsEnabled && next.graphicsQuality !== 'Performance';
     this.renderer.shadowMap.enabled = allowShadows;
     this.keyLight.castShadow = allowShadows;
     if (this.bloomPass) {
-      this.bloomPass.strength = next.graphicsQuality === 'Ultra' ? 0.3 : 0.2;
+      this.bloomPass.strength = next.graphicsQuality === 'Ultra' ? 0.14 : 0.09;
     }
   }
 
   public orbitYawBy(deltaRadians: number): void {
     this.cameraYaw = normalizeAngle(this.cameraYaw + deltaRadians);
     this.manualOrbitCooldown = 2.4;
+  }
+
+  public adjustFpsLook(deltaYaw: number, deltaPitch: number): void {
+    this.cameraYaw = normalizeAngle(this.cameraYaw + deltaYaw);
+    this.cameraPitch = Math.max(-0.42, Math.min(0.32, this.cameraPitch + deltaPitch));
+    this.manualOrbitCooldown = 1.6;
+  }
+
+  public getForwardAimWorldCm(engine: SunderloomEngine): { x: number; y: number } {
+    const dirX = -Math.sin(this.cameraYaw);
+    const dirZ = -Math.cos(this.cameraYaw);
+    return {
+      x: engine.playerX + dirX * 900,
+      y: engine.playerY + dirZ * 900,
+    };
   }
 
   public resize(width: number, height: number): void {
@@ -474,17 +531,26 @@ export class SunderloomThreeViewport {
     const safeDt = Math.min(0.05, Math.max(0.001, dt));
     const t = engine.ambientTime;
 
+    const isFps = !isTitleScreen && this.settings.cameraPreset === 'FirstPerson';
     this.titleGroup.visible = isTitleScreen;
-    this.wardenRig.root.visible = !isTitleScreen;
+    this.wardenRig.root.visible = !isTitleScreen && !isFps;
+    this.fpsViewModel.visible = isFps;
     this.particleInstanced.visible = !isTitleScreen;
     if (this.builtDungeon) this.builtDungeon.group.visible = !isTitleScreen;
 
     if (isTitleScreen) {
+      this.camera.fov = this.settings.fov;
+      this.camera.updateProjectionMatrix();
       this.superNovaDome.visible = false;
       this.superNovaRing.visible = false;
       this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
       this.updateTitleScene(t);
     } else {
+      const targetFov = isFps ? Math.max(76, this.settings.fov + 18) : this.settings.fov;
+      if (Math.abs(this.camera.fov - targetFov) > 0.25) {
+        this.camera.fov = THREE.MathUtils.damp(this.camera.fov, targetFov, 10, safeDt);
+        this.camera.updateProjectionMatrix();
+      }
       this.ensureDungeonBuilt(engine);
       this.syncGameplayScene(engine, safeDt, t);
     }
@@ -520,7 +586,7 @@ export class SunderloomThreeViewport {
     this.keyLight.position.set(6, 12, 7);
     this.keyLight.target.position.set(0.8, 1.2, 0);
     this.wardenRimLight.position.set(1.6, 2.2, 2.0);
-    this.wardenRimLight.intensity = 6.5 + Math.sin(t * 3) * 1.1;
+    this.wardenRimLight.intensity = 3.8 + Math.sin(t * 3) * 0.6;
 
     this.titleFireGroups.forEach((entry, idx) => {
       const f = 0.88 + Math.sin(t * 8.2 + idx * 1.9) * 0.14;
@@ -528,8 +594,8 @@ export class SunderloomThreeViewport {
       const pt = this.brazierLights[idx];
       if (pt) {
         pt.position.set(entry.x, entry.y, entry.z);
-        pt.color.setHex(0xff7e26);
-        pt.intensity = 15 * f;
+        pt.color.setHex(0xf28130);
+        pt.intensity = 9.5 * f;
       }
     });
 
@@ -564,21 +630,25 @@ export class SunderloomThreeViewport {
     }
 
     const speed = Math.hypot(engine.playerVx, engine.playerVy);
-    if (this.settings.autoFollowCamera && this.manualOrbitCooldown <= 0 && speed > 80) {
+    const isFps = this.settings.cameraPreset === 'FirstPerson';
+
+    if (
+      !isFps &&
+      this.settings.autoFollowCamera &&
+      this.manualOrbitCooldown <= 0 &&
+      speed > 80
+    ) {
       // Gently steer camera behind the Warden's direction of movement (like Unreal SpringArm auto-align)
-      // For movement direction (vx, vy) in engine space (vx = +X, vy = +Z), camera forward (-sin(yaw), -cos(yaw))
-      // matches (vx, vy) when desiredYaw = atan2(-vx, -vy)
       const desiredYaw = Math.atan2(-engine.playerVx, -engine.playerVy);
       const diff = normalizeAngle(desiredYaw - this.cameraYaw);
-      // Only follow gently if player isn't walking straight backward toward camera
       if (Math.abs(diff) < Math.PI * 0.78) {
-        const followRate = this.settings.cameraPreset === 'ThirdPerson' ? 1.55 : 0.95;
+        const followRate = this.settings.cameraPreset === 'ThirdPerson' ? 1.55 : 0.9;
         this.cameraYaw = normalizeAngle(this.cameraYaw + diff * (1 - Math.exp(-followRate * dt)));
       }
     }
     engine.setCameraYaw(this.cameraYaw);
 
-    // 1. Update Unbound Warden 3D Rig & Procedural Combat Kinematics
+    // 1. Update Unbound Warden 3D Rig & Procedural Combat Kinematics (and FPS Viewmodel)
     this.wardenRig.root.position.set(px, 0, pz);
     this.wardenRig.root.rotation.y = Math.PI / 2 - engine.playerFacing;
 
@@ -589,6 +659,15 @@ export class SunderloomThreeViewport {
     this.wardenRig.bodyPivot.position.y = moving ? Math.abs(stride) * 0.08 : Math.sin(t * 2.4) * 0.025;
     this.wardenRig.bodyPivot.rotation.x = engine.dodgeTimer > 0 ? 0.36 : moving ? 0.12 : 0;
     this.wardenRig.cloak.rotation.x = 0.24 + (moving ? 0.42 : 0.05) + Math.sin(t * 6.5) * 0.08;
+
+    // Animate First-Person Valorant-style foreground Runeblade sway & recoil
+    if (isFps) {
+      const bobX = moving ? Math.sin(engine.walkCycle * 1.45) * 0.024 : Math.sin(t * 1.8) * 0.006;
+      const bobY = moving ? Math.abs(Math.cos(engine.walkCycle * 1.45)) * 0.02 : Math.cos(t * 1.8) * 0.005;
+      const swingKick = engine.combatState === 'Active' ? -0.45 : engine.combatState === 'Windup' ? 0.28 : 0;
+      this.fpsBladePivot.position.set(0.38 + bobX, -0.34 - bobY, -0.64 + (engine.combatState === 'Active' ? -0.14 : 0));
+      this.fpsBladePivot.rotation.set(swingKick, engine.combatState === 'Active' ? -0.52 : -0.12, 0.08);
+    }
 
     if (engine.combatState === 'Windup') {
       this.wardenRig.swordArm.rotation.x = -1.35;
@@ -625,57 +704,115 @@ export class SunderloomThreeViewport {
       m.color.copy(this.wardenRig.baseArmorColors[idx]);
     });
 
-    // 2. Dynamic Orbiting 3D SpringArm Camera with 3 View Presets + Look-Ahead + Hit Trauma Shake
-    const presetConfig = {
-      ThirdPerson: { dist: 7.8, height: 5.4, lookAhead: 1.8, lookY: 1.35 },
-      Cinematic: { dist: 10.6, height: 10.2, lookAhead: 0.9, lookY: 1.0 },
-      Tactical: { dist: 12.2, height: 16.4, lookAhead: 0.3, lookY: 0.6 },
-    }[this.settings.cameraPreset];
+    // Detect active Enemy Battlefield Zone for Battlefield Clear Room View
+    const activeRoom = engine.findRoomContaining(engine.playerX, engine.playerY);
+    const activeRoomId = activeRoom?.id ?? -1;
+    const livingEnemiesInRoom = activeRoom
+      ? engine.enemies.filter((e) => !e.health.isDead && e.roomId === activeRoom.id).length
+      : 0;
+    const inBattleZone =
+      activeRoom !== null &&
+      (activeRoom.runicGatesLocked || livingEnemiesInRoom > 0 || activeRoom.type === 'Boss');
 
+    // 2. Dynamic 4-Mode Camera System (3rd Person / First-Person Valorant FPS / Top-Down / Cinematic)
     const sinY = Math.sin(this.cameraYaw);
     const cosY = Math.cos(this.cameraYaw);
-    const targetX = engine.camX * CM_TO_M;
-    const targetZ = engine.camY * CM_TO_M;
-
-    const desiredLookX = targetX - sinY * presetConfig.lookAhead;
-    const desiredLookZ = targetZ - cosY * presetConfig.lookAhead;
-    const desiredCamX = targetX + sinY * presetConfig.dist;
-    const desiredCamZ = targetZ + cosY * presetConfig.dist;
-
-    this.camLook.x = THREE.MathUtils.damp(this.camLook.x, desiredLookX, 10, dt);
-    this.camLook.y = THREE.MathUtils.damp(this.camLook.y, presetConfig.lookY, 8, dt);
-    this.camLook.z = THREE.MathUtils.damp(this.camLook.z, desiredLookZ, 10, dt);
-
-    this.camPos.x = THREE.MathUtils.damp(this.camPos.x, desiredCamX, 9, dt);
-    this.camPos.y = THREE.MathUtils.damp(this.camPos.y, presetConfig.height, 8, dt);
-    this.camPos.z = THREE.MathUtils.damp(this.camPos.z, desiredCamZ, 9, dt);
-
     const shakeMag =
       this.settings.screenShake && engine.trauma > 0.02 ? engine.trauma * engine.trauma * 0.42 : 0;
     const sx = shakeMag > 0 ? (Math.random() - 0.5) * 2 * shakeMag : 0;
     const sy = shakeMag > 0 ? (Math.random() - 0.5) * 2 * shakeMag : 0;
 
-    this.camera.position.set(this.camPos.x + sx, this.camPos.y + sy, this.camPos.z);
-    this.camera.lookAt(this.camLook);
+    if (isFps) {
+      // Valorant-style Eye-Level First-Person Tactical Camera
+      const eyeY = 1.66 + (moving ? Math.abs(stride) * 0.045 : 0);
+      const lookDist = 14;
+      const cosP = Math.cos(this.cameraPitch);
+      const sinP = Math.sin(this.cameraPitch);
+      this.camPos.set(px, eyeY, pz);
+      this.camLook.set(px - sinY * cosP * lookDist, eyeY + sinP * lookDist, pz - cosY * cosP * lookDist);
+      this.camera.position.set(this.camPos.x + sx * 0.3, this.camPos.y + sy * 0.3, this.camPos.z);
+      this.camera.lookAt(this.camLook);
+      // Keep Warden facing synchronized with FPS crosshair forward direction
+      const fpsAim = this.getForwardAimWorldCm(engine);
+      engine.setAimWorldTarget(fpsAim.x, fpsAim.y);
+    } else {
+      const basePreset = {
+        ThirdPerson: { dist: 7.8, height: 5.4, lookAhead: 1.8, lookY: 1.35 },
+        TopDown: { dist: 3.4, height: 18.2, lookAhead: 0.25, lookY: 0.4 },
+        Cinematic: { dist: 10.6, height: 10.2, lookAhead: 0.9, lookY: 1.0 },
+      }[this.settings.cameraPreset];
 
-    // 3. Smart Real-Time Wall Cutaway (foreground walls between camera and Warden lower cleanly!)
+      // Battlefield Clear Room Framing: automatically lift & frame combat arena for crystal-clear tactical sightlines
+      const battleLift = inBattleZone && this.settings.battlefieldClearView ? 2.6 : 0;
+      const battlePull = inBattleZone && this.settings.battlefieldClearView ? 1.6 : 0;
+
+      let targetX = engine.camX * CM_TO_M;
+      let targetZ = engine.camY * CM_TO_M;
+      if (inBattleZone && this.settings.battlefieldClearView && activeRoom) {
+        const roomCenterX = (activeRoom.x + activeRoom.width / 2) * CM_TO_M;
+        const roomCenterZ = (activeRoom.y + activeRoom.height / 2) * CM_TO_M;
+        const bias = this.settings.cameraPreset === 'TopDown' ? 0.34 : 0.22;
+        targetX = THREE.MathUtils.lerp(targetX, roomCenterX, bias);
+        targetZ = THREE.MathUtils.lerp(targetZ, roomCenterZ, bias);
+      }
+
+      const desiredLookX = targetX - sinY * basePreset.lookAhead;
+      const desiredLookZ = targetZ - cosY * basePreset.lookAhead;
+      const desiredCamX = targetX + sinY * (basePreset.dist + battlePull);
+      const desiredCamZ = targetZ + cosY * (basePreset.dist + battlePull);
+
+      if (this.snapCameraNextFrame) {
+        this.camLook.set(desiredLookX, basePreset.lookY, desiredLookZ);
+        this.camPos.set(desiredCamX, basePreset.height + battleLift, desiredCamZ);
+        this.snapCameraNextFrame = false;
+      } else {
+        this.camLook.x = THREE.MathUtils.damp(this.camLook.x, desiredLookX, 10, dt);
+        this.camLook.y = THREE.MathUtils.damp(this.camLook.y, basePreset.lookY, 8, dt);
+        this.camLook.z = THREE.MathUtils.damp(this.camLook.z, desiredLookZ, 10, dt);
+
+        this.camPos.x = THREE.MathUtils.damp(this.camPos.x, desiredCamX, 9, dt);
+        this.camPos.y = THREE.MathUtils.damp(this.camPos.y, basePreset.height + battleLift, 7, dt);
+        this.camPos.z = THREE.MathUtils.damp(this.camPos.z, desiredCamZ, 9, dt);
+      }
+
+      this.camera.position.set(this.camPos.x + sx, this.camPos.y + sy, this.camPos.z);
+      this.camera.lookAt(this.camLook);
+    }
+
+    if (isFps && this.snapCameraNextFrame) {
+      this.snapCameraNextFrame = false;
+    }
+
+    // 3. Smart Real-Time Wall Cutaway + Battlefield Clear Room Mode
     if (this.builtDungeon) {
-      // Camera-to-target vector on XZ plane: camera sits toward (+sinY, +cosY) from player
       const camDirX = sinY;
       const camDirZ = cosY;
-      const activeRoom = engine.findRoomContaining(engine.playerX, engine.playerY);
-      const activeRoomId = activeRoom?.id ?? -1;
 
       for (const wg of this.builtDungeon.wallGroups) {
-        // Outward normal of each room wall side (dir 0=+X, 1=+Z, 2=-X, 3=-Z)
-        const nx = wg.dir === 0 ? 1 : wg.dir === 2 ? -1 : 0;
-        const nz = wg.dir === 1 ? 1 : wg.dir === 3 ? -1 : 0;
-        const facesCamera = nx * camDirX + nz * camDirZ > 0.25;
-        // Cut down walls on the camera-facing side of the active room (or any room when in Cinematic/Tactical)
-        const shouldCut =
-          facesCamera &&
-          (wg.roomId === activeRoomId || this.settings.cameraPreset !== 'ThirdPerson');
-        const targetScaleY = shouldCut ? 0.16 : 1.0;
+        let targetScaleY = 1.0;
+
+        if (!isFps) {
+          const nx = wg.dir === 0 ? 1 : wg.dir === 2 ? -1 : 0;
+          const nz = wg.dir === 1 ? 1 : wg.dir === 3 ? -1 : 0;
+          const dotCam = nx * camDirX + nz * camDirZ;
+
+          if (inBattleZone && this.settings.battlefieldClearView && wg.roomId === activeRoomId) {
+            // Battlefield Clear Room View: drop ALL foreground + flanking walls in the enemy room to floor plinth
+            // so the player has a 100% unobstructed view of every enemy, hazard, and doorway!
+            if (this.settings.cameraPreset === 'TopDown' || dotCam > -0.25) {
+              targetScaleY = 0.11;
+            }
+          } else {
+            const facesCamera = dotCam > 0.25;
+            const shouldCut =
+              facesCamera &&
+              (wg.roomId === activeRoomId || this.settings.cameraPreset !== 'ThirdPerson');
+            if (shouldCut) {
+              targetScaleY = 0.16;
+            }
+          }
+        }
+
         wg.currentScaleY = THREE.MathUtils.damp(wg.currentScaleY, targetScaleY, 10, dt);
         wg.group.scale.y = wg.currentScaleY;
       }
@@ -700,8 +837,8 @@ export class SunderloomThreeViewport {
         if (i < this.brazierLights.length) {
           const light = this.brazierLights[i];
           light.position.set(b.x, b.y, b.z);
-          light.color.setHex(b.isBoss ? 0xe6452e : 0xff7e26);
-          light.intensity = (b.isBoss ? 18 : 15) * flick;
+          light.color.setHex(b.isBoss ? 0xd9422b : 0xf28130);
+          light.intensity = (b.isBoss ? 11.5 : 9.6) * flick;
         }
       }
     }
@@ -710,7 +847,7 @@ export class SunderloomThreeViewport {
     this.keyLight.position.set(px + 9, 19, pz + 7);
     this.keyLight.target.position.set(px, 0, pz);
     this.wardenRimLight.position.set(px, 2.3, pz);
-    this.wardenRimLight.intensity = engine.combatState === 'Active' ? 10.5 : 5.4;
+    this.wardenRimLight.intensity = engine.combatState === 'Active' ? 5.6 : 3.2;
 
     // 5. Sunder Nova 3D Super Shockwave VFX
     if (engine.superNovaTimer > 0) {

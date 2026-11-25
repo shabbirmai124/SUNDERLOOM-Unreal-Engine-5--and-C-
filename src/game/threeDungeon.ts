@@ -65,27 +65,29 @@ export function buildThreeDungeon(
     return m;
   };
 
-  // Textured dark weathered stone for all walls AND trim cornices (no flat light-grey blocks!)
+  // Strictly matte weathered ashlar stone for all walls AND trim cornices (crisp readability, zero glare)
   const wallBaseMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x8f857b,
+      color: 0xa89f94,
       map: textures.wallAlbedo,
       bumpMap: textures.wallBump,
       bumpScale: 0.1,
       roughnessMap: textures.wallRoughness,
-      roughness: 0.84,
-      metalness: 0.1,
+      roughness: 0.92,
+      metalness: 0.04,
+      envMapIntensity: 0.25,
     }),
   );
 
   const darkCarvedTrimMat = trackMat(
     new THREE.MeshStandardMaterial({
-      color: 0x524b45,
+      color: 0x696058,
       map: textures.wallAlbedo,
       bumpMap: textures.wallBump,
       bumpScale: 0.08,
-      roughness: 0.82,
-      metalness: 0.18,
+      roughness: 0.9,
+      metalness: 0.06,
+      envMapIntensity: 0.25,
     }),
   );
 
@@ -120,8 +122,9 @@ export function buildThreeDungeon(
     trackMat(
       new THREE.MeshStandardMaterial({
         color: 0x120d0b,
-        roughness: 0.95,
-        metalness: 0.05,
+        roughness: 0.96,
+        metalness: 0.03,
+        envMapIntensity: 0.15,
       }),
     ),
   );
@@ -137,7 +140,7 @@ export function buildThreeDungeon(
     const cx = rx + rw / 2;
     const cz = rz + rd / 2;
 
-    // 1. Textured PBR Basalt Flagstone Floor Slab + Carved Deep Sub-Foundation Skirt
+    // 1. Textured Matte PBR Basalt Flagstone Floor Slab + Carved Deep Sub-Foundation Skirt
     const floorAlbedo = textures.floorAlbedo.clone();
     const floorBump = textures.floorBump.clone();
     const floorRough = textures.floorRoughness.clone();
@@ -148,10 +151,10 @@ export function buildThreeDungeon(
 
     const floorTint =
       room.type === 'Boss'
-        ? 0x8f726e
+        ? 0xa68680
         : room.type === 'Treasure'
-          ? 0x9c907b
-          : 0x8f887e;
+          ? 0xb5a891
+          : 0xa8a095;
 
     const floorMat = trackMat(
       new THREE.MeshStandardMaterial({
@@ -160,8 +163,9 @@ export function buildThreeDungeon(
         bumpMap: floorBump,
         bumpScale: 0.08,
         roughnessMap: floorRough,
-        roughness: 0.74,
-        metalness: 0.12,
+        roughness: 0.9,
+        metalness: 0.04,
+        envMapIntensity: 0.24,
       }),
     );
 

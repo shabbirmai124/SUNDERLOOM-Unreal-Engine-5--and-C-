@@ -72,7 +72,79 @@ void UCombatComponent::RequestRuneLance()
 	}
 
 	LastRuneLanceTime = World->GetTimeSeconds();
-	SpawnRuneProjectileFromAim();
+	SpawnRuneProjectileFromAim(1.25f);
+}
+
+void UCombatComponent::AddSuperCharge(float Amount)
+{
+	const float Next = FMath::Clamp(SuperCharge + Amount, 0.0f, 100.0f);
+	if (!FMath::IsNearlyEqual(Next, SuperCharge))
+	{
+		SuperCharge = Next;
+		OnSuperChargeChanged.Broadcast(SuperCharge);
+	}
+}
+
+void UCombatComponent::RequestAetherSuper()
+{
+	UWorld* World = GetWorld();
+	AActor* Owner = GetOwner();
+	if (!IsValid(World) || !IsValid(Owner) || CombatState == ECombatState::Dead || SuperCharge < 100.0f)
+	{
+		return;
+	}
+
+	SuperCharge = 0.0f;
+	OnSuperChargeChanged.Broadcast(SuperCharge);
+
+	float BaseDamage = 24.0f;
+	if (UStatsComponent* Stats = Owner->FindComponentByClass<UStatsComponent>())
+	{
+		BaseDamage = Stats->GetFinalStat(EStatType::MeleeDamage);
+	}
+	const float NovaDamage = BaseDamage * 3.2f;
+
+	const ICombatInterface* OwnerCombat = Cast<ICombatInterface>(Owner);
+	const EFactionID OwnerFaction = OwnerCombat ? OwnerCombat->GetFactionID() : EFactionID::Player;
+
+	// Radial Sunder Nova Shockwave Sweep
+	TArray<FOverlapResult> Overlaps;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(Owner);
+	World->OverlapMultiByChannel(
+		Overlaps,
+		Owner->GetActorLocation(),
+		FQuat::Identity,
+		ECC_WeaponTrace,
+		FCollisionShape::MakeSphere(SuperNovaRadiusCm),
+		Params);
+
+	TSet<AActor*> DamagedActors;
+	for (const FOverlapResult& Res : Overlaps)
+	{
+		AActor* HitActor = Res.GetActor();
+		if (!IsValid(HitActor) || DamagedActors.Contains(HitActor)) continue;
+		ICombatInterface* TargetCombat = Cast<ICombatInterface>(HitActor);
+		if (!TargetCombat || TargetCombat->IsCombatDead() || TargetCombat->GetFactionID() == OwnerFaction) continue;
+
+		DamagedActors.Add(HitActor);
+		if (UHealthComponent* TargetHealth = TargetCombat->GetHealthComponent())
+		{
+			TargetHealth->ApplyUnifiedDamage(NovaDamage, HitActor->GetActorLocation(), Owner, true, true);
+		}
+		const FVector PushDir = (HitActor->GetActorLocation() - Owner->GetActorLocation()).GetSafeNormal2D();
+		TargetCombat->ApplyHitReaction(PushDir, 100.0f, true);
+	}
+
+	SpawnRadialSuperBolts();
+
+	if (ACharacter* OwnerChar = Cast<ACharacter>(Owner))
+	{
+		if (ASunderloomPlayerController* PC = Cast<ASunderloomPlayerController>(OwnerChar->GetController()))
+		{
+			PC->TriggerScaledCameraShake(true, 1.85f);
+		}
+	}
 }
 
 bool UCombatComponent::TryCancelIntoDodge()
@@ -258,6 +330,7 @@ void UCombatComponent::TickWeaponSweep(USkeletalMeshComponent* WeaponMesh)
 		if (UHealthComponent* TargetHealth = TargetCombat->GetHealthComponent())
 		{
 			TargetHealth->ApplyUnifiedDamage(FinalDamage, Hit.ImpactPoint, Owner, bCurrentAttackIsHeavy, bCrit);
+			AddSuperCharge(TargetHealth->IsDead() ? 20.0f : 8.0f);
 		}
 
 		const float PoiseDmg = bCurrentAttackIsHeavy ? 40.0f : 15.0f;
@@ -283,7 +356,7 @@ void UCombatComponent::EndWeaponSweep()
 	}
 }
 
-void UCombatComponent::SpawnRuneProjectileFromAim()
+void UCombatComponent::SpawnRuneProjectileFromAim(float DamageMultiplier)
 {
 	UWorld* World = GetWorld();
 	ACharacter* OwnerChar = Cast<ACharacter>(GetOwner());
@@ -334,7 +407,42 @@ void UCombatComponent::SpawnRuneProjectileFromAim()
 		}
 		const ICombatInterface* OwnerCombat = Cast<ICombatInterface>(OwnerChar);
 		const EFactionID Faction = OwnerCombat ? OwnerCombat->GetFactionID() : EFactionID::Player;
-		Proj->InitializeProjectile(Faction, RangedDamage);
+		Proj->InitializeProjectile(Faction, RangedDamage * DamageMultiplier);
+	}
+}
+
+void UCombatComponent::SpawnRadialSuperBolts()
+{
+	UWorld* World = GetWorld();
+	ACharacter* OwnerChar = Cast<ACharacter>(GetOwner());
+	if (!IsValid(World) || !IsValid(OwnerChar) || !IsValid(RuneProjectileClass))
+	{
+		return;
+	}
+
+	float RangedDamage = 18.0f;
+	if (UStatsComponent* Stats = OwnerChar->FindComponentByClass<UStatsComponent>())
+	{
+		RangedDamage = Stats->GetFinalStat(EStatType::RangedDamage);
+	}
+	const ICombatInterface* OwnerCombat = Cast<ICombatInterface>(OwnerChar);
+	const EFactionID Faction = OwnerCombat ? OwnerCombat->GetFactionID() : EFactionID::Player;
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = OwnerChar;
+	SpawnParams.Instigator = OwnerChar;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	const FVector Origin = OwnerChar->GetActorLocation() + FVector(0.0f, 0.0f, 45.0f);
+	for (int32 i = 0; i < 8; ++i)
+	{
+		const float YawDeg = i * 45.0f;
+		const FRotator BoltRot(0.0f, YawDeg, 0.0f);
+		const FVector SpawnLoc = Origin + BoltRot.Vector() * 50.0f;
+		if (ARuneProjectile* Proj = World->SpawnActor<ARuneProjectile>(RuneProjectileClass, SpawnLoc, BoltRot, SpawnParams))
+		{
+			Proj->InitializeProjectile(Faction, RangedDamage * 1.6f);
+		}
 	}
 }
 

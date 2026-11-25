@@ -6,7 +6,12 @@ import { TitleScreen } from './components/TitleScreen';
 import { gameAudio } from './game/audio';
 import { SunderloomEngine, type HudSnapshot } from './game/engine';
 import { loadSaveProfile, saveProfileAsync } from './game/saveStorage';
-import { loadGameSettings, saveGameSettings, type GameSettings } from './game/settings';
+import {
+  CAMERA_PRESET_ORDER,
+  loadGameSettings,
+  saveGameSettings,
+  type GameSettings,
+} from './game/settings';
 import { SunderloomThreeViewport } from './game/threeRenderer';
 import type { FRunSummarySnapshot, FSaveProfile } from './game/types';
 
@@ -16,10 +21,11 @@ const INITIAL_HUD: HudSnapshot = {
   hp: 120,
   maxHp: 120,
   shield: 0,
+  superCharge: 35,
   floor: 1,
   seed: 41029,
   roomsCleared: 0,
-  totalCombatRooms: 4,
+  totalCombatRooms: 6,
   aetherThreads: 0,
   kills: 0,
   relicCount: 0,
@@ -59,6 +65,7 @@ export default function App() {
   const [runSummary, setRunSummary] = useState<FRunSummarySnapshot | null>(null);
   const [floorBanner, setFloorBanner] = useState<{ floor: number; seed: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mapExpanded, setMapExpanded] = useState(false);
   const [minimapTick, setMinimapTick] = useState(0);
 
   const viewportContainerRef = useRef<HTMLDivElement | null>(null);
@@ -66,10 +73,14 @@ export default function App() {
   const engineRef = useRef<SunderloomEngine | null>(null);
   const gameStateRef = useRef<GameScreenState>(gameState);
   const settingsOpenRef = useRef<boolean>(settingsOpen);
+  const settingsRef = useRef<GameSettings>(settings);
+  const mapExpandedRef = useRef<boolean>(mapExpanded);
   const bannerTimerRef = useRef<number | null>(null);
 
   gameStateRef.current = gameState;
   settingsOpenRef.current = settingsOpen;
+  settingsRef.current = settings;
+  mapExpandedRef.current = mapExpanded;
 
   // Mirror game state machine strictly to document.body.dataset.state
   useEffect(() => {
@@ -100,6 +111,17 @@ export default function App() {
     }
   }, []);
 
+  const handleCycleCamera = useCallback(() => {
+    setSettings((prev) => {
+      const idx = CAMERA_PRESET_ORDER.indexOf(prev.cameraPreset);
+      const nextPreset = CAMERA_PRESET_ORDER[(idx + 1) % CAMERA_PRESET_ORDER.length];
+      const next: GameSettings = { ...prev, cameraPreset: nextPreset };
+      saveGameSettings(next);
+      viewportRef.current?.applySettings(next);
+      return next;
+    });
+  }, []);
+
   const handleToggleMute = useCallback(() => {
     setSettings((prev) => {
       const next = { ...prev, muted: !prev.muted };
@@ -116,6 +138,7 @@ export default function App() {
       engine.startFreshRun(optionalSeed);
     }
     setSettingsOpen(false);
+    setMapExpanded(false);
     setRunSummary(null);
     document.body.dataset.state = 'playing';
     setGameState('playing');
@@ -155,6 +178,7 @@ export default function App() {
       },
       onRunEnded: (summary) => {
         setRunSummary(summary);
+        setMapExpanded(false);
         document.body.dataset.state = 'gameover';
         setGameState('gameover');
       },
@@ -187,15 +211,25 @@ export default function App() {
     const ro = new ResizeObserver(handleResize);
     ro.observe(document.documentElement);
 
+    let lastMouseX: number | null = null;
+    let lastMouseY: number | null = null;
+    let isOrbitDragging = false;
+
     const updateMouseAim = (clientX: number, clientY: number) => {
       const rect = container.getBoundingClientRect();
       const sx = clientX - rect.left;
       const sy = clientY - rect.top;
       engine.mouseScreenX = sx;
       engine.mouseScreenY = sy;
-      const hit = viewport.screenToWorldCm(sx, sy);
-      if (hit) {
-        engine.setAimWorldTarget(hit.x, hit.y);
+
+      if (settingsRef.current.cameraPreset === 'FirstPerson') {
+        const fpsAim = viewport.getForwardAimWorldCm(engine);
+        engine.setAimWorldTarget(fpsAim.x, fpsAim.y);
+      } else {
+        const hit = viewport.screenToWorldCm(sx, sy);
+        if (hit) {
+          engine.setAimWorldTarget(hit.x, hit.y);
+        }
       }
     };
 
@@ -213,9 +247,20 @@ export default function App() {
         return;
       }
 
+      if (e.code === 'Tab' && gameStateRef.current === 'playing') {
+        e.preventDefault();
+        setMapExpanded((prev) => !prev);
+        return;
+      }
+
       if (e.code === 'Escape' || e.code === 'KeyP') {
+        if (mapExpandedRef.current) {
+          setMapExpanded(false);
+          return;
+        }
         if (gameStateRef.current === 'playing') {
           engine.clearInputs();
+          if (document.pointerLockElement) document.exitPointerLock?.();
           setGameState('paused');
           return;
         }
@@ -241,6 +286,10 @@ export default function App() {
           engine.requestInteract();
         } else if (e.code === 'KeyQ') {
           engine.requestHeavyAttack();
+        } else if (e.code === 'KeyR' || e.code === 'KeyF') {
+          engine.requestAetherSuper();
+        } else if (e.code === 'KeyV') {
+          handleCycleCamera();
         } else if (e.code === 'Quote') {
           engine.toggleDebugOverlay();
         }
@@ -253,18 +302,43 @@ export default function App() {
     };
 
     const onMouseMove = (e: MouseEvent) => {
+      const dx = lastMouseX !== null ? e.clientX - lastMouseX : 0;
+      const dy = lastMouseY !== null ? e.clientY - lastMouseY : 0;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+
+      if (gameStateRef.current === 'playing' && !settingsOpenRef.current && !mapExpandedRef.current) {
+        if (settingsRef.current.cameraPreset === 'FirstPerson') {
+          const moveX = document.pointerLockElement ? e.movementX : dx;
+          const moveY = document.pointerLockElement ? e.movementY : dy;
+          if (Math.abs(moveX) > 0 || Math.abs(moveY) > 0) {
+            viewport.adjustFpsLook(-moveX * 0.0042, -moveY * 0.0028);
+          }
+        } else if (isOrbitDragging || e.shiftKey) {
+          viewport.orbitYawBy(-dx * 0.006);
+        }
+      }
       updateMouseAim(e.clientX, e.clientY);
     };
 
     const onMouseDown = (e: MouseEvent) => {
-      if (settingsOpenRef.current || gameStateRef.current !== 'playing') return;
+      if (settingsOpenRef.current || mapExpandedRef.current || gameStateRef.current !== 'playing') return;
       if (e.target !== viewport.renderer.domElement) return;
+      if (e.button === 1) {
+        e.preventDefault();
+        isOrbitDragging = true;
+        return;
+      }
       updateMouseAim(e.clientX, e.clientY);
       if (e.button === 0) {
         engine.requestLightAttack();
       } else if (e.button === 2) {
         engine.requestRuneLance();
       }
+    };
+
+    const onMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) isOrbitDragging = false;
     };
 
     const onContextMenu = (e: MouseEvent) => {
@@ -274,6 +348,7 @@ export default function App() {
     };
 
     const onBlurOrHide = () => {
+      isOrbitDragging = false;
       engine.clearInputs();
     };
 
@@ -281,6 +356,7 @@ export default function App() {
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('contextmenu', onContextMenu);
     window.addEventListener('blur', onBlurOrHide);
     document.addEventListener('visibilitychange', onBlurOrHide);
@@ -345,6 +421,7 @@ export default function App() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('blur', onBlurOrHide);
       document.removeEventListener('visibilitychange', onBlurOrHide);
@@ -364,7 +441,7 @@ export default function App() {
   void minimapTick;
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#06080D]">
+    <div className="relative w-full h-full overflow-hidden bg-[#0C0A09]">
       {/* Dedicated Isolated Full-Bleed 3D WebGL Viewport Container */}
       <div
         ref={viewportContainerRef}
@@ -388,9 +465,14 @@ export default function App() {
           hud={hud}
           dungeon={currentDungeon}
           playerPos={currentPlayerPos}
+          cameraPreset={settings.cameraPreset}
           muted={settings.muted}
           showMinimap={settings.showMinimap}
+          mapExpanded={mapExpanded}
           floorBanner={floorBanner}
+          onCycleCamera={handleCycleCamera}
+          onToggleMapExpanded={() => setMapExpanded((v) => !v)}
+          onTriggerSuper={() => engineRef.current?.requestAetherSuper()}
           onToggleMute={handleToggleMute}
           onOpenSettings={() => {
             engineRef.current?.clearInputs();
@@ -434,7 +516,7 @@ export default function App() {
         />
       )}
 
-      {/* Full AAA Settings Modal (Display, Camera, Audio, Controls) */}
+      {/* Full AAA Settings Modal (Display, Camera Modes, Audio, Controls) */}
       {settingsOpen && (
         <SettingsModal
           settings={settings}

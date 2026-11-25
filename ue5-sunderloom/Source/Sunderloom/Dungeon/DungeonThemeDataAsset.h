@@ -67,12 +67,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Scaling")
 	TObjectPtr<UCurveTable> FloorDifficultyCurveTable;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules", meta = (ClampMin = "5"))
-	int32 BaseTargetRoomCount = 9;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules", meta = (ClampMin = "8"))
+	int32 BaseTargetRoomCount = 12;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules", meta = (ClampMin = "4"))
-	int32 MinValidRoomCount = 6;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules", meta = (ClampMin = "6"))
+	int32 MinValidRoomCount = 8;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules")
-	int32 AdditionalRoomsPerFloor = 2;
+	int32 AdditionalRoomsPerFloor = 3;
 };

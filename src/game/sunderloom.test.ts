@@ -140,4 +140,25 @@ test('Core Gameplay Engine: Phase Step I-Frames, 3D raycast aim, room lock, and 
   engine.step(0.05, true);
   assert.equal(combatRoom.runicGatesLocked, true);
   assert.ok(engine.spawnTelegraphs.length > 0);
+
+  // 4. After Phase Step completes, Left-Click performs Sword Slice ONLY (0 projectiles), Right-Click shoots Rune Lance ONLY
+  for (let i = 0; i < 8; i++) engine.step(0.05, true);
+  const projBefore = engine.projectiles.length;
+  engine.requestLightAttack();
+  assert.equal(engine.combatState, 'Windup');
+  assert.equal(engine.projectiles.length, projBefore);
+  for (let i = 0; i < 10; i++) engine.step(0.05, true);
+  engine.requestRuneLance();
+  assert.ok(engine.projectiles.length > projBefore);
+
+  // 5. Expanded Dungeon Map places >= 10 rooms on Floor 1
+  assert.ok(engine.dungeon.rooms.length >= 10);
+
+  // 6. Sunder Nova Super unleashes shockwave + 8-way bolts and consumes 100% Super Charge
+  engine.superCharge = 100;
+  const projBeforeSuper = engine.projectiles.length;
+  engine.requestAetherSuper();
+  assert.equal(engine.superCharge, 0);
+  assert.ok(engine.superNovaTimer > 0);
+  assert.equal(engine.projectiles.length, projBeforeSuper + 8);
 });

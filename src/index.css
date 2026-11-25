@@ -1,56 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-@theme {
-  --font-display: "Cinzel", Georgia, serif;
-  --font-sans: "Manrope", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+:root {
+  --bg-basalt: #0d0b0a;
+  --surface-iron: #161311;
+  --surface-elevated: #211c19;
+  --border-bronze: #3b3127;
+  --accent-gold: #c89b54;
+  --accent-ember: #d96b27;
+  --accent-crimson: #b82c26;
+  --text-ivory: #eae3d5;
+  --text-ash: #a69b8d;
 }
 
-@layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background-color: #090b0e;
-    color: #e6ebf2;
-    font-family: var(--font-sans);
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--bg-basalt);
+  color: var(--text-ivory);
+  font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 .font-display {
-  font-family: var(--font-display);
+  font-family: 'Cinzel', Georgia, serif;
 }
 
 .font-mono-tabular {
-  font-family: var(--font-mono);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
 
 .hud-numeral {
-  font-variant-numeric: tabular-nums;
-  paint-order: stroke fill;
-  -webkit-text-stroke: 2px rgba(9, 11, 14, 0.9);
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.94);
 }
 
-/* Custom subtle obsidian scrollbar for C++ explorer */
 .sunderloom-scroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 .sunderloom-scroll::-webkit-scrollbar-track {
-  background: #0c0f14;
+  background: #0d0b0a;
 }
 
 .sunderloom-scroll::-webkit-scrollbar-thumb {
-  background: #232b36;
-  border-radius: 4px;
+  background: #332a22;
+  border-radius: 2px;
 }
 
 .sunderloom-scroll::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #524334;
 }

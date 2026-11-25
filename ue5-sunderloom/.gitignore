@@ -1,0 +1,20 @@
+# Unreal Engine 5 Build & Intermediate Artifacts
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.idea/
+.vscode/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.xcodeproj/
+*.xcworkspace/
+*.pdb
+*.obj
+*.log

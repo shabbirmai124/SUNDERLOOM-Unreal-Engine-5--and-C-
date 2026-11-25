@@ -374,35 +374,6 @@ export class SunderloomEngine {
     this.combatState = 'Windup';
     this.activeSweepArc = 0;
     this.updateAimFacing();
-
-    // Left-Click fires a crisp Forged Aether Bolt along the aim line in addition to close-range cleave
-    const boltSpeed = this.currentAttackHeavy ? 1720 : 1560;
-    const vx = Math.cos(this.playerFacing) * boltSpeed;
-    const vy = Math.sin(this.playerFacing) * boltSpeed;
-    const boltDamage = Math.round(
-      (this.stats.RangedDamage * 0.85 + this.stats.MeleeDamage * 0.25) *
-        (this.currentAttackHeavy ? 1.35 : 1.0),
-    );
-    this.projectiles.push({
-      id: this.nextEntityId++,
-      faction: 'Player',
-      x: this.playerX + Math.cos(this.playerFacing) * 52,
-      y: this.playerY + Math.sin(this.playerFacing) * 52,
-      vx,
-      vy,
-      radius: this.currentAttackHeavy ? 20 : 14,
-      damage: boltDamage,
-      life: 1.85,
-      color: this.currentAttackHeavy ? '#E0B46A' : '#D96B27',
-    });
-    this.spawnParticles(
-      this.playerX + Math.cos(this.playerFacing) * 52,
-      this.playerY + Math.sin(this.playerFacing) * 52,
-      5,
-      this.currentAttackHeavy ? '#E0B46A' : '#D96B27',
-      170,
-    );
-
     gameAudio.playSwing(this.comboStep);
   }
 

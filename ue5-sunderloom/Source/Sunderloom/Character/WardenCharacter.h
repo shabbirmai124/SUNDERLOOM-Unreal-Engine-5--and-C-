@@ -24,6 +24,7 @@ public:
 	AWardenCharacter();
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	// ICombatInterface
@@ -31,6 +32,18 @@ public:
 	virtual EFactionID GetFactionID() const override { return EFactionID::Player; }
 	virtual bool IsCombatDead() const override;
 	virtual void ApplyHitReaction(const FVector& HitDirection, float PoiseDamage, bool bIsHeavyHit) override;
+
+	UFUNCTION(BlueprintCallable, Category = "Sunderloom|Camera")
+	void ApplyCameraPreset(ECameraViewPreset NewPreset);
+
+	UFUNCTION(BlueprintCallable, Category = "Sunderloom|Camera")
+	void CycleCameraView();
+
+	UFUNCTION(BlueprintCallable, Category = "Sunderloom|Camera")
+	void SetInActiveBattleRoom(bool bInBattle);
+
+	UFUNCTION(BlueprintPure, Category = "Sunderloom|Camera")
+	ECameraViewPreset GetCameraPreset() const { return ActiveCameraPreset; }
 
 	UFUNCTION(BlueprintPure, Category = "Sunderloom|Warden")
 	UStatsComponent* GetStatsComponent() const { return StatsComponent; }
@@ -45,6 +58,8 @@ protected:
 	void HandleLightAttack();
 	void HandleHeavyAttack();
 	void HandleRuneLance();
+	void HandleAetherSuper();
+	void HandleCycleCamera();
 	void HandleInteract();
 	void HandlePause();
 
@@ -61,6 +76,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sunderloom|Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sunderloom|Camera")
+	TObjectPtr<UCameraComponent> FirstPersonCamera;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sunderloom|Components")
 	TObjectPtr<UHealthComponent> HealthComponent;
 
@@ -70,7 +88,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sunderloom|Components")
 	TObjectPtr<UStatsComponent> StatsComponent;
 
-	// Eight mandatory Enhanced Input Actions
+	// Enhanced Input Actions (Movement, Look, Combat, Super, Camera View, Interact, Pause)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Input")
 	TObjectPtr<UInputAction> IA_Move;
 
@@ -88,6 +106,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Input")
 	TObjectPtr<UInputAction> IA_RuneLance;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Input")
+	TObjectPtr<UInputAction> IA_AetherSuper;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Input")
+	TObjectPtr<UInputAction> IA_CycleCamera;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sunderloom|Input")
 	TObjectPtr<UInputAction> IA_Interact;
@@ -111,6 +135,10 @@ protected:
 	float InteractionRadius = 240.0f;
 
 private:
+	ECameraViewPreset ActiveCameraPreset = ECameraViewPreset::ThirdPerson;
+	bool bInActiveBattleRoom = false;
+	float TargetArmLengthCm = 620.0f;
+	float ManualLookCooldown = 0.0f;
 	FVector2D CachedMoveInput = FVector2D::ZeroVector;
 	bool bIsDodgeOnCooldown = false;
 	float SavedGroundFriction = 8.0f;

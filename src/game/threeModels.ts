@@ -61,76 +61,85 @@ export interface SharedRigMaterials {
 }
 
 export function createSharedRigMaterials(textures: SunderloomTextureSuite): SharedRigMaterials {
-  // Matte weathered blackened Damascus steel (zero shiny plastic look)
+  // Matte weathered blackened Damascus steel (crisp bright readability, zero shiny specular glare)
   const blackenedSteel = new THREE.MeshStandardMaterial({
-    color: 0x4b4845,
+    color: 0x5c5750,
     map: textures.metalAlbedo,
     roughnessMap: textures.metalRoughness,
-    metalness: 0.78,
-    roughness: 0.48,
+    metalness: 0.22,
+    roughness: 0.88,
+    envMapIntensity: 0.28,
   });
 
   const forgedIron = new THREE.MeshStandardMaterial({
-    color: 0x33302d,
+    color: 0x45403b,
     map: textures.metalAlbedo,
     roughnessMap: textures.metalRoughness,
-    metalness: 0.72,
-    roughness: 0.56,
+    metalness: 0.18,
+    roughness: 0.9,
+    envMapIntensity: 0.25,
   });
 
-  // Tarnished hammered antique bronze/gold trim
+  // Matte tarnished hammered antique bronze (warm golden tone, zero mirror reflection or white-hot bloom)
   const antiqueGold = new THREE.MeshStandardMaterial({
-    color: 0xc2954e,
+    color: 0xad884d,
     roughnessMap: textures.metalRoughness,
-    metalness: 0.86,
-    roughness: 0.34,
+    metalness: 0.18,
+    roughness: 0.88,
+    envMapIntensity: 0.25,
   });
 
   const charredCloth = new THREE.MeshStandardMaterial({
-    color: 0x1d1917,
-    roughness: 0.94,
-    metalness: 0.04,
+    color: 0x2b2623,
+    roughness: 0.96,
+    metalness: 0.02,
+    envMapIntensity: 0.22,
     side: THREE.DoubleSide,
   });
 
   const crimsonCloth = new THREE.MeshStandardMaterial({
-    color: 0x5c1a18,
-    roughness: 0.88,
-    metalness: 0.06,
+    color: 0x732320,
+    roughness: 0.94,
+    metalness: 0.02,
+    envMapIntensity: 0.24,
     side: THREE.DoubleSide,
   });
 
-  // Authentic AAA Dark-Fantasy Emissive Accents (Forge Ember, Tarnished Gold, Blood Crimson, Pale Silver)
+  // Restrained AAA Dark-Fantasy Emissive Accents (warm glow without blinding bloom clipping)
   const emberGlow = new THREE.MeshStandardMaterial({
-    color: 0xf59e42,
-    emissive: 0xd96b27,
-    emissiveIntensity: 2.0,
-    roughness: 0.25,
-    metalness: 0.15,
+    color: 0xd1742e,
+    emissive: 0xb85219,
+    emissiveIntensity: 0.86,
+    roughness: 0.78,
+    metalness: 0.05,
+    envMapIntensity: 0.2,
   });
 
   const goldGlow = new THREE.MeshStandardMaterial({
-    color: 0xf0cf8e,
-    emissive: 0xc89b54,
-    emissiveIntensity: 1.9,
-    roughness: 0.22,
-    metalness: 0.3,
+    color: 0xc29855,
+    emissive: 0x916a2e,
+    emissiveIntensity: 0.72,
+    roughness: 0.8,
+    metalness: 0.08,
+    envMapIntensity: 0.2,
   });
 
   const crimsonGlow = new THREE.MeshStandardMaterial({
-    color: 0xe6493e,
-    emissive: 0xb8241d,
-    emissiveIntensity: 2.1,
-    roughness: 0.25,
-    metalness: 0.15,
+    color: 0xc43a31,
+    emissive: 0x941c16,
+    emissiveIntensity: 0.9,
+    roughness: 0.78,
+    metalness: 0.05,
+    envMapIntensity: 0.2,
   });
 
   const spectralGlow = new THREE.MeshStandardMaterial({
-    color: 0xeae3d5,
-    emissive: 0xc9b99b,
-    emissiveIntensity: 1.5,
-    roughness: 0.22,
-    metalness: 0.2,
+    color: 0xd1c7b6,
+    emissive: 0x8f816a,
+    emissiveIntensity: 0.72,
+    roughness: 0.8,
+    metalness: 0.06,
+    envMapIntensity: 0.2,
   });
 
   const contactShadowMat = new THREE.MeshBasicMaterial({
@@ -466,7 +475,8 @@ export function createEnemyRig(archetype: EEnemyArchetype, mats: SharedRigMateri
   if (archetype === 'ThreadlingRusher') {
     // Segmented chitinous dark-iron arachnid-stalker with glowing furnace core & jointed razor legs
     bodyMat.color.setHex(0x2e211f);
-    bodyMat.roughness = 0.44;
+    bodyMat.roughness = 0.84;
+    bodyMat.metalness = 0.22;
     addContactShadow(root, 0.82, mats.contactShadowMat);
 
     const abdomen = new THREE.Mesh(new THREE.DodecahedronGeometry(0.38, 1), bodyMat);
@@ -550,8 +560,8 @@ export function createEnemyRig(archetype: EEnemyArchetype, mats: SharedRigMateri
   } else if (archetype === 'IroncladLoomguard') {
     // Towering Cathedral Siege Juggernaut with horned greathelm, spiked pauldrons, tower shield & war-mace
     bodyMat.color.setHex(0x3a342e);
-    bodyMat.metalness = 0.82;
-    bodyMat.roughness = 0.42;
+    bodyMat.metalness = 0.26;
+    bodyMat.roughness = 0.84;
     addContactShadow(root, 1.35, mats.contactShadowMat);
 
     for (const [side, grp] of [
@@ -615,8 +625,8 @@ export function createEnemyRig(archetype: EEnemyArchetype, mats: SharedRigMateri
   } else {
     // WeaverWardenBoss — Towering 3.6m Horned Obsidian Sovereign Boss
     bodyMat.color.setHex(0x281c1a);
-    bodyMat.metalness = 0.86;
-    bodyMat.roughness = 0.36;
+    bodyMat.metalness = 0.28;
+    bodyMat.roughness = 0.82;
     addContactShadow(root, 2.25, mats.contactShadowMat);
 
     for (const [side, grp] of [

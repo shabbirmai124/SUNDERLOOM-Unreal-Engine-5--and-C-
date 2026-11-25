@@ -5,6 +5,7 @@
 #include "Core/InteractionInterface.h"
 #include "Core/SunderloomGameInstance.h"
 #include "Core/SunderloomGameMode.h"
+#include "Core/SunderloomGameUserSettings.h"
 #include "Core/SunderloomPlayerController.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -16,7 +17,7 @@
 
 AWardenCharacter::AWardenCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -40,6 +41,25 @@ AWardenCharacter::AWardenCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+	// Matte dark-fantasy bright-contrast post-process calibration (matches WebGL exposure=1.16, bloomThreshold=1.45, zero glare)
+	FollowCamera->PostProcessSettings.bOverride_BloomIntensity = true;
+	FollowCamera->PostProcessSettings.BloomIntensity = 0.08f;
+	FollowCamera->PostProcessSettings.bOverride_BloomThreshold = true;
+	FollowCamera->PostProcessSettings.BloomThreshold = 1.45f;
+	FollowCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
+	FollowCamera->PostProcessSettings.AutoExposureBias = 0.0f;
+	FollowCamera->PostProcessSettings.bOverride_ColorContrast = true;
+	FollowCamera->PostProcessSettings.ColorContrast = FVector4(1.06f, 1.06f, 1.06f, 1.0f);
+	FollowCamera->PostProcessSettings.bOverride_LumenReflectionQuality = true;
+	FollowCamera->PostProcessSettings.LumenReflectionQuality = 0.50f;
+
+	// Valorant-style Eye-Level First-Person Tactical Camera
+	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+	FirstPersonCamera->SetupAttachment(RootComponent);
+	FirstPersonCamera->SetRelativeLocation(FVector(12.0f, 0.0f, 68.0f));
+	FirstPersonCamera->bUsePawnControlRotation = true;
+	FirstPersonCamera->PostProcessSettings = FollowCamera->PostProcessSettings;
+	FirstPersonCamera->SetActive(false);
 
 	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
@@ -68,6 +88,128 @@ void AWardenCharacter::BeginPlay()
 			HealthComponent->SetCurrentHealthExact(RunState.SavedRunHealth);
 		}
 	}
+
+	if (USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings())
+	{
+		ApplyCameraPreset(Settings->CameraViewPreset);
+	}
+	else
+	{
+		ApplyCameraPreset(ECameraViewPreset::ThirdPerson);
+	}
+}
+
+void AWardenCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (ManualLookCooldown > 0.0f)
+	{
+		ManualLookCooldown = FMath::Max(0.0f, ManualLookCooldown - DeltaSeconds);
+	}
+
+	const USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings();
+	const bool bAutoFollow = Settings ? Settings->bAutoFollowCamera : true;
+	const bool bBattleClear = Settings ? Settings->bBattlefieldClearView : true;
+
+	// Smooth Battlefield Clear Room Framing: pulls camera back & widens sightlines in combat rooms
+	if (IsValid(CameraBoom) && ActiveCameraPreset != ECameraViewPreset::FirstPerson)
+	{
+		const float DesiredLen = TargetArmLengthCm + (bInActiveBattleRoom && bBattleClear ? 240.0f : 0.0f);
+		CameraBoom->TargetArmLength = FMath::FInterpTo(CameraBoom->TargetArmLength, DesiredLen, DeltaSeconds, 6.0f);
+	}
+
+	// Auto-Follow Travel View: gently aligns yaw behind Warden's movement direction
+	if (bAutoFollow && ActiveCameraPreset != ECameraViewPreset::FirstPerson && ManualLookCooldown <= 0.0f && IsValid(Controller))
+	{
+		const FVector Vel2D(GetVelocity().X, GetVelocity().Y, 0.0f);
+		if (Vel2D.SizeSquared() > 14400.0f)
+		{
+			const float TargetYaw = Vel2D.Rotation().Yaw;
+			FRotator ControlRot = Controller->GetControlRotation();
+			const float DeltaYaw = FMath::FindDeltaAngleDegrees(ControlRot.Yaw, TargetYaw);
+			if (FMath::Abs(DeltaYaw) < 135.0f)
+			{
+				ControlRot.Yaw = FMath::FixedTurn(ControlRot.Yaw, TargetYaw, 65.0f * DeltaSeconds);
+				Controller->SetControlRotation(ControlRot);
+			}
+		}
+	}
+}
+
+void AWardenCharacter::ApplyCameraPreset(ECameraViewPreset NewPreset)
+{
+	ActiveCameraPreset = NewPreset;
+	const USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings();
+	const float BaseFov = Settings ? Settings->CameraFieldOfView : 54.0f;
+
+	const bool bIsFps = (NewPreset == ECameraViewPreset::FirstPerson);
+	if (IsValid(FollowCamera))
+	{
+		FollowCamera->SetActive(!bIsFps);
+		FollowCamera->SetFieldOfView(BaseFov);
+	}
+	if (IsValid(FirstPersonCamera))
+	{
+		FirstPersonCamera->SetActive(bIsFps);
+		FirstPersonCamera->SetFieldOfView(FMath::Clamp(BaseFov + 20.0f, 76.0f, 105.0f));
+	}
+	if (IsValid(GetMesh()))
+	{
+		GetMesh()->SetOwnerNoSee(bIsFps);
+	}
+
+	bUseControllerRotationYaw = bIsFps;
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->bOrientRotationToMovement = !bIsFps;
+	}
+
+	if (IsValid(CameraBoom))
+	{
+		switch (NewPreset)
+		{
+		case ECameraViewPreset::ThirdPerson:
+			TargetArmLengthCm = 620.0f;
+			CameraBoom->bUsePawnControlRotation = true;
+			CameraBoom->bDoCollisionTest = true;
+			CameraBoom->SetRelativeRotation(FRotator(-28.0f, 0.0f, 0.0f));
+			break;
+		case ECameraViewPreset::TopDown:
+			TargetArmLengthCm = 1580.0f;
+			CameraBoom->bUsePawnControlRotation = false;
+			CameraBoom->bDoCollisionTest = false;
+			CameraBoom->SetRelativeRotation(FRotator(-76.0f, 0.0f, 0.0f));
+			break;
+		case ECameraViewPreset::Cinematic:
+			TargetArmLengthCm = 1040.0f;
+			CameraBoom->bUsePawnControlRotation = true;
+			CameraBoom->bDoCollisionTest = false;
+			CameraBoom->SetRelativeRotation(FRotator(-44.0f, 0.0f, 0.0f));
+			break;
+		case ECameraViewPreset::FirstPerson:
+			TargetArmLengthCm = 0.0f;
+			break;
+		}
+	}
+}
+
+void AWardenCharacter::CycleCameraView()
+{
+	const uint8 NextIdx = (static_cast<uint8>(ActiveCameraPreset) + 1) % 4;
+	const ECameraViewPreset NextPreset = static_cast<ECameraViewPreset>(NextIdx);
+	ApplyCameraPreset(NextPreset);
+
+	if (USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings())
+	{
+		Settings->CameraViewPreset = NextPreset;
+		Settings->SaveSettings();
+	}
+}
+
+void AWardenCharacter::SetInActiveBattleRoom(bool bInBattle)
+{
+	bInActiveBattleRoom = bInBattle;
 }
 
 void AWardenCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -83,6 +225,8 @@ void AWardenCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	if (IsValid(IA_LightAttack)) EIC->BindAction(IA_LightAttack, ETriggerEvent::Started,   this, &AWardenCharacter::HandleLightAttack);
 	if (IsValid(IA_HeavyAttack)) EIC->BindAction(IA_HeavyAttack, ETriggerEvent::Started,   this, &AWardenCharacter::HandleHeavyAttack);
 	if (IsValid(IA_RuneLance))   EIC->BindAction(IA_RuneLance,   ETriggerEvent::Started,   this, &AWardenCharacter::HandleRuneLance);
+	if (IsValid(IA_AetherSuper)) EIC->BindAction(IA_AetherSuper, ETriggerEvent::Started,   this, &AWardenCharacter::HandleAetherSuper);
+	if (IsValid(IA_CycleCamera)) EIC->BindAction(IA_CycleCamera, ETriggerEvent::Started,   this, &AWardenCharacter::HandleCycleCamera);
 	if (IsValid(IA_Interact))    EIC->BindAction(IA_Interact,    ETriggerEvent::Started,   this, &AWardenCharacter::HandleInteract);
 	if (IsValid(IA_Pause))       EIC->BindAction(IA_Pause,       ETriggerEvent::Started,   this, &AWardenCharacter::HandlePause);
 }
@@ -103,6 +247,10 @@ void AWardenCharacter::HandleMove(const FInputActionValue& Value)
 void AWardenCharacter::HandleLook(const FInputActionValue& Value)
 {
 	const FVector2D LookAxis = Value.Get<FVector2D>();
+	if (!LookAxis.IsNearlyZero())
+	{
+		ManualLookCooldown = 2.0f;
+	}
 	AddControllerYawInput(LookAxis.X);
 	AddControllerPitchInput(LookAxis.Y);
 }
@@ -194,6 +342,16 @@ void AWardenCharacter::HandleHeavyAttack()
 void AWardenCharacter::HandleRuneLance()
 {
 	if (IsValid(CombatComponent)) CombatComponent->RequestRuneLance();
+}
+
+void AWardenCharacter::HandleAetherSuper()
+{
+	if (IsValid(CombatComponent)) CombatComponent->RequestAetherSuper();
+}
+
+void AWardenCharacter::HandleCycleCamera()
+{
+	CycleCameraView();
 }
 
 void AWardenCharacter::HandleInteract()

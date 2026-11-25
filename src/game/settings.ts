@@ -1,5 +1,12 @@
 export type GraphicsQuality = 'Ultra' | 'High' | 'Performance';
-export type CameraPreset = 'ThirdPerson' | 'Cinematic' | 'Tactical';
+export type CameraPreset = 'ThirdPerson' | 'FirstPerson' | 'TopDown' | 'Cinematic';
+
+export const CAMERA_PRESET_ORDER: CameraPreset[] = [
+  'ThirdPerson',
+  'FirstPerson',
+  'TopDown',
+  'Cinematic',
+];
 
 export interface GameSettings {
   graphicsQuality: GraphicsQuality;
@@ -7,6 +14,7 @@ export interface GameSettings {
   bloomEnabled: boolean;
   cameraPreset: CameraPreset;
   autoFollowCamera: boolean;
+  battlefieldClearView: boolean;
   fov: number;
   masterVolume: number;
   muted: boolean;
@@ -14,7 +22,7 @@ export interface GameSettings {
   showMinimap: boolean;
 }
 
-const SETTINGS_KEY = 'sunderloom_settings_v2';
+const SETTINGS_KEY = 'sunderloom_settings_v3';
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
   graphicsQuality: 'Ultra',
@@ -22,7 +30,8 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   bloomEnabled: true,
   cameraPreset: 'ThirdPerson',
   autoFollowCamera: true,
-  fov: 52,
+  battlefieldClearView: true,
+  fov: 54,
   masterVolume: 0.8,
   muted: false,
   screenShake: true,
@@ -51,17 +60,22 @@ export function loadGameSettings(): GameSettings {
           : DEFAULT_GAME_SETTINGS.bloomEnabled,
       cameraPreset:
         parsed.cameraPreset === 'ThirdPerson' ||
-        parsed.cameraPreset === 'Cinematic' ||
-        parsed.cameraPreset === 'Tactical'
+        parsed.cameraPreset === 'FirstPerson' ||
+        parsed.cameraPreset === 'TopDown' ||
+        parsed.cameraPreset === 'Cinematic'
           ? parsed.cameraPreset
           : DEFAULT_GAME_SETTINGS.cameraPreset,
       autoFollowCamera:
         typeof parsed.autoFollowCamera === 'boolean'
           ? parsed.autoFollowCamera
           : DEFAULT_GAME_SETTINGS.autoFollowCamera,
+      battlefieldClearView:
+        typeof parsed.battlefieldClearView === 'boolean'
+          ? parsed.battlefieldClearView
+          : DEFAULT_GAME_SETTINGS.battlefieldClearView,
       fov:
         typeof parsed.fov === 'number'
-          ? Math.max(40, Math.min(72, Math.round(parsed.fov)))
+          ? Math.max(40, Math.min(90, Math.round(parsed.fov)))
           : DEFAULT_GAME_SETTINGS.fov,
       masterVolume:
         typeof parsed.masterVolume === 'number'

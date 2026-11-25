@@ -13,6 +13,15 @@ enum class EFactionID : uint8
 };
 
 UENUM(BlueprintType)
+enum class ECameraViewPreset : uint8
+{
+	ThirdPerson UMETA(DisplayName = "3rd Person (Running)"),
+	FirstPerson UMETA(DisplayName = "First Person (FPS / Valorant)"),
+	TopDown     UMETA(DisplayName = "Top-Down Tactical"),
+	Cinematic   UMETA(DisplayName = "Cinematic Dark Fantasy")
+};
+
+UENUM(BlueprintType)
 enum class ECombatState : uint8
 {
 	Idle      UMETA(DisplayName = "Idle"),

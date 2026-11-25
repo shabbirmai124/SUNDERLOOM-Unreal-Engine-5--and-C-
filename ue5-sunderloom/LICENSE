@@ -1,21 +1,18 @@
-MIT License
+PROPRIETARY SOFTWARE LICENSE — ALL RIGHTS RESERVED
+SUNDERLOOM: THE SHIFTING VAULT (UNREAL ENGINE 5 C++ PROJECT)
 
-Copyright (c) 2026 SUNDERLOOM
+Copyright (c) 2026 SUNDERLOOM Author. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+STRICT NO-USE WITHOUT PRIOR WRITTEN CONSENT
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+All Unreal Engine 5 C++ source files (`.h`, `.cpp`, `.Build.cs`, `.Target.cs`),
+project definitions (`Sunderloom.uproject`), engine configuration files (`Config/*.ini`),
+and gameplay data tables (`Content/Data/*.csv`) inside this directory are strictly
+proprietary intellectual property of the Copyright Holder.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Nobody may copy, compile for redistribution, modify, integrate, sell, publish, or
+use this code in any personal, educational, or commercial project without the
+explicit prior written consent of the Copyright Holder.
+
+Unreal Engine 5 itself is a trademark and product of Epic Games, Inc., governed
+separately by the Unreal Engine End User License Agreement (EULA).

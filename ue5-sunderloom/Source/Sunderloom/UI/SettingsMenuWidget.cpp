@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SUNDERLOOM. Strict Unreal Engine 5.8 C++ Architecture.
 
 #include "UI/SettingsMenuWidget.h"
+#include "Character/WardenCharacter.h"
 #include "Components/Button.h"
 #include "Components/CheckBox.h"
 #include "Components/Slider.h"
@@ -13,6 +14,20 @@ void USettingsMenuWidget::NativeConstruct()
 
     if (USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings())
     {
+        RefreshCameraPresetLabel(Settings->CameraViewPreset);
+
+        if (CameraPresetButton)
+        {
+            CameraPresetButton->OnClicked.AddDynamic(this, &USettingsMenuWidget::HandleCameraPresetClicked);
+        }
+        if (AutoFollowCheckBox)
+        {
+            AutoFollowCheckBox->SetIsChecked(Settings->bAutoFollowCamera);
+        }
+        if (BattlefieldClearCheckBox)
+        {
+            BattlefieldClearCheckBox->SetIsChecked(Settings->bBattlefieldClearView);
+        }
         if (FOVSlider)
         {
             FOVSlider->SetMinValue(40.0f);
@@ -49,6 +64,53 @@ void USettingsMenuWidget::NativeConstruct()
     }
 }
 
+void USettingsMenuWidget::RefreshCameraPresetLabel(ECameraViewPreset Preset)
+{
+    if (!CameraPresetText) return;
+    switch (Preset)
+    {
+    case ECameraViewPreset::ThirdPerson:
+        CameraPresetText->SetText(FText::FromString(TEXT("3rd Person (Running)")));
+        break;
+    case ECameraViewPreset::FirstPerson:
+        CameraPresetText->SetText(FText::FromString(TEXT("First Person (FPS)")));
+        break;
+    case ECameraViewPreset::TopDown:
+        CameraPresetText->SetText(FText::FromString(TEXT("Top-Down Tactical")));
+        break;
+    case ECameraViewPreset::Cinematic:
+        CameraPresetText->SetText(FText::FromString(TEXT("Cinematic")));
+        break;
+    }
+}
+
+void USettingsMenuWidget::SetCameraPreset(ECameraViewPreset NewPreset)
+{
+    if (USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings())
+    {
+        Settings->CameraViewPreset = NewPreset;
+        RefreshCameraPresetLabel(NewPreset);
+        if (AWardenCharacter* Warden = Cast<AWardenCharacter>(GetOwningPlayerPawn()))
+        {
+            Warden->ApplyCameraPreset(NewPreset);
+        }
+    }
+}
+
+void USettingsMenuWidget::CycleCameraPreset()
+{
+    if (USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings())
+    {
+        const uint8 NextIdx = (static_cast<uint8>(Settings->CameraViewPreset) + 1) % 4;
+        SetCameraPreset(static_cast<ECameraViewPreset>(NextIdx));
+    }
+}
+
+void USettingsMenuWidget::HandleCameraPresetClicked()
+{
+    CycleCameraPreset();
+}
+
 void USettingsMenuWidget::HandleFOVChanged(float NewValue)
 {
     if (FOVValueText)
@@ -69,11 +131,18 @@ void USettingsMenuWidget::HandleApplyClicked()
 {
     if (USunderloomGameUserSettings* Settings = USunderloomGameUserSettings::GetSunderloomUserSettings())
     {
+        if (AutoFollowCheckBox) Settings->bAutoFollowCamera = AutoFollowCheckBox->IsChecked();
+        if (BattlefieldClearCheckBox) Settings->bBattlefieldClearView = BattlefieldClearCheckBox->IsChecked();
         if (FOVSlider) Settings->CameraFieldOfView = FOVSlider->GetValue();
         if (MasterVolumeSlider) Settings->MasterAudioVolume = MasterVolumeSlider->GetValue();
         if (LumenGICheckBox) Settings->bEnableLumenGI = LumenGICheckBox->IsChecked();
         if (BloomCheckBox) Settings->bEnableVolumetricBloom = BloomCheckBox->IsChecked();
         if (CameraShakeCheckBox) Settings->bCameraShakeEnabled = CameraShakeCheckBox->IsChecked();
         Settings->ApplySunderloomSettings(false);
+
+        if (AWardenCharacter* Warden = Cast<AWardenCharacter>(GetOwningPlayerPawn()))
+        {
+            Warden->ApplyCameraPreset(Settings->CameraViewPreset);
+        }
     }
 }

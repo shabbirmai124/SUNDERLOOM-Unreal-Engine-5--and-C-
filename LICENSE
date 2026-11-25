@@ -1,21 +1,40 @@
-MIT License
+PROPRIETARY SOFTWARE LICENSE — ALL RIGHTS RESERVED
 
-Copyright (c) 2026 SUNDERLOOM
+Copyright (c) 2026 SUNDERLOOM Author. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+STRICT NO-USE WITHOUT PRIOR WRITTEN CONSENT
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This repository, including all source code (both Unreal Engine 5 C++ source files
+under `/ue5-sunderloom/` and the 3D WebGL/TypeScript build under `/src/`), game
+design systems, procedural generation algorithms, shaders, textures, audio logic,
+data tables, documentation, and visual assets (collectively, the "Software"), is
+the confidential and proprietary intellectual property of the Copyright Holder.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. NO LICENSE GRANTED
+   No right, title, or interest in or to the Software is granted to any person or
+   entity. Viewing this repository does NOT grant permission to use the Software.
+
+2. PROHIBITED ACTIONS WITHOUT EXPLICIT WRITTEN CONSENT
+   Without the prior, explicit, signed written consent of the Copyright Holder,
+   you may NOT, in whole or in part:
+   (a) Copy, clone for reuse, reproduce, or mirror the Software;
+   (b) Use, execute in production, or integrate any part of the Software into
+       personal, academic, open-source, or commercial projects;
+   (c) Modify, adapt, translate, reverse-engineer, or create derivative works;
+   (d) Distribute, publish, sell, sublicense, lease, or transfer the Software;
+   (e) Use the Software or its assets to train machine learning or AI models.
+
+3. THIRD-PARTY LIBRARIES & KIT NOTICES
+   Certain third-party software development kits and libraries referenced or
+   installed via package managers (such as Unreal Engine 5, React, Three.js, Vite,
+   Tailwind CSS, and Lucide Icons) remain governed by their respective third-party
+   licenses as documented in `LICENSE-THIRD-PARTY.md`. Those third-party licenses
+   apply ONLY to those unmodified third-party libraries and do NOT grant any rights
+   to SUNDERLOOM's proprietary source code or assets.
+
+4. ENFORCEMENT & CONTACT
+   Unauthorized use, copying, or redistribution constitutes copyright infringement
+   and will be enforced to the fullest extent of applicable law. To request written
+   permission or a commercial license, contact the Copyright Holder directly.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
